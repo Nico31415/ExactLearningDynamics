@@ -16,6 +16,14 @@ We will also apply our findings to problems like Matrix Completion, Continual Le
 ## Objective 2: Investigating the Information Dynamics of Deep Neural Networks
 The second objective is grounded in the framework proposed by Tishby and Schwartz-Ziv, [3][4],  which posits a two stage learning process in deep neural networks: a “fitting” phase where layers increase information on the labels, followed by a “compression” phase where layers reduce information on the output. However, recent work by Andrew Saxe [5] has revealed counterexamples to these claims, showing that the dynamics of learning are highly dependent on factors such as the choice of activation functions and the network’s overall structure. Our objective is to perform a comprehensive analysis of these claims, delving into the conditions and mechanisms governing these transitions, including the effects of learning rate schedules and loss landscapes. Possible work could also include applying the principles of Information Bottleneck theory to the domain of continual learning, exploring how neural networks can effectively retain previously acquired knowledge while learning new tasks. This research will be done using a blend of mathematical an computational techniques.
 
+In Andrew Saxe's paper ‘On the Information Bottleneck Theory of Deep Learning’ he and his collaborators write:
+
+*“We emphasise that compression still may occur within a subset of the input dimensions if the task demands it. This compression, however, is interleaved rather than in a secondary phase and many not be visible by information metrics that track the overall information between a hidden layer and the input”*
+
+One possible idea to investigate would be to find effective estimators of task-related vs non-task-related information, and utilise this to refine the analysis in this paper. We could check if they have different dynamics, try to derive some analytical and computational results etc.
+
+A potential approach would be to consider a linear student-teacher network, partitioning the input into a set of tasks-relevant inputs X_rel and a set of task-irrelevant inputs X_irrel. This is described more in depth in section 5 of the paper (“Simultaneous Fitting and Compression”). Maybe starting with linear networks means that we could find an analytical expression for these metrics, which can then be generalised to different network architectures.
+
 
 
 ## Overall Goal: Integration for a Comprehensive Understanding
