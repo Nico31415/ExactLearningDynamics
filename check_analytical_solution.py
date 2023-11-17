@@ -1,17 +1,8 @@
 import gooseberry as gs
 
-import seaborn as sns
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-from matplotlib.patches import Ellipse
 import numpy as np
 
-import jax
-import jax.numpy as jnp
-from functools import partial
-
-from dynamics import QQT
-from dynamics import QQT_balanced
 from tools import BlindColours, zero_balanced_weights
 
 
@@ -81,7 +72,7 @@ def check_analytical_solution(solution):
 
     3: 1/tau (FQQt + QQtF - (QQt)^2)
 
-    4: exponent stuff, doesnt converge well
+    4: exponent stuff, doesn't converge well
     """
     in_dim = 5
     hidden_dim = 10
@@ -99,14 +90,15 @@ def check_analytical_solution(solution):
     train, _, _ = gs.datasets.StudentTeacher(batch_size, [init_w1, init_w2], [gs.datasets.Whiten()])
 
     (X, Y) = train(None)
+    train = (X, Y)
 
     plot_items_n = 4
     blind_colours = BlindColours().get_colours()
     c = 0
 
-    Q0 = np.vstack([init_w1.T, init_w2])
+    q0 = np.vstack([init_w1.T, init_w2])
 
-    QQt0 = Q0 @ Q0.T
+    qqt0 = q0 @ q0.T
 
     sigma_xy = Y.T @ X
 
@@ -116,8 +108,8 @@ def check_analytical_solution(solution):
     ])
 
     required_shape = (init_w2 @ init_w1).shape
-    QQts = [QQt0]
-    w2w1s = [[QQt0[-required_shape[0]:, :required_shape[1]]]]
+    QQts = [qqt0]
+    w2w1s = [[qqt0[-required_shape[0]:, :required_shape[1]]]]
 
     U_, S_, Vt_ = np.linalg.svd(sigma_xy)
 
@@ -161,11 +153,11 @@ def check_analytical_solution(solution):
             t = i * learning_rate
             e_ft = np.exp(t / tau * F)
 
-            out = e_ft @ Q0
+            out = e_ft @ q0
             centre_centre = e_ft @ np.linalg.inv(F) @ e_ft - np.linalg.inv(F)
-            # print(np.eye(F.shape[0]) + 1/2 * Q0.T @ centre_centre @ Q0)
+            # print(np.eye(F.shape[0]) + 1/2 * q0.T @ centre_centre @ q0)
             try:
-                centre = np.linalg.inv(np.eye(F.shape[0]) + 1 / 2 * Q0.T @ centre_centre @ Q0)
+                centre = np.linalg.inv(np.eye(F.shape[0]) + 1 / 2 * q0.T @ centre_centre @ q0)
             except:
                 print(i)
                 return
@@ -174,7 +166,6 @@ def check_analytical_solution(solution):
             QQts.append(next)
             w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
 
-
     elif solution == '10':
         for i in range(1, training_steps):
             t = i * learning_rate
@@ -182,27 +173,26 @@ def check_analytical_solution(solution):
             print(t)
             e_lmdat = e_lmda ** t
 
-            left = O @ e_lmdat @ O.T @ Q0
+            left = O @ e_lmdat @ O.T @ q0
             right = left.T
 
-            centre = np.linalg.inv(np.eye(lmda_inv.shape[0]) + 1 / 2 * Q0.T @ (
-                        O @ e_lmdat @ O.T @ O @ lmda_inv @ O.T @ e_lmdat @ O.T - O @ lmda_inv @ O.T))
+            centre = np.linalg.inv(np.eye(lmda_inv.shape[0]) + 1 / 2 * q0.T @ (
+                    O @ e_lmdat @ O.T @ O @ lmda_inv @ O.T @ e_lmdat @ O.T - O @ lmda_inv @ O.T))
 
             next = left @ centre @ right
             QQts.append(next)
             w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
-
 
     elif solution == '12':
         for i in range(1, training_steps):
             t = i * learning_rate
             e_lmdat = e_lmda ** t
 
-            left = O @ e_lmdat @ O.T @ Q0
+            left = O @ e_lmdat @ O.T @ q0
             right = left.T
 
-            centre = np.linalg.inv(np.eye(lmda_inv.shape[0]) + 1 / 2 * Q0.T @ (
-                        O @ e_lmdat @ lmda_inv @ e_lmdat @ O.T - O @ lmda_inv @ O.T) @ Q0)
+            centre = np.linalg.inv(np.eye(lmda_inv.shape[0]) + 1 / 2 * q0.T @ (
+                    O @ e_lmdat @ lmda_inv @ e_lmdat @ O.T - O @ lmda_inv @ O.T) @ q0)
 
             next = left @ centre @ right
             QQts.append(next)
@@ -212,13 +202,13 @@ def check_analytical_solution(solution):
         for i in range(1, training_steps):
             t = i * learning_rate
             e_lmdat = e_lmda ** t
-            e_lmdat = e_lmda ** (2 * t)
+            e_2lmdat = e_lmda ** (2 * t)
 
-            left = O @ e_lmdat @ O.T @ Q0
+            left = O @ e_lmdat @ O.T @ q0
             right = left.T
 
             centre = np.linalg.inv(
-                np.eye(lmda_inv.shape) + 1 / 2 * Q0.T @ O @ (e_2lmdat @ lmda_inv - lmda_inv) @ O.T @ Q0)
+                np.eye(lmda_inv.shape) + 1 / 2 * q0.T @ O @ (e_2lmdat @ lmda_inv - lmda_inv) @ O.T @ q0)
 
             next = left @ centre @ right
             QQts.append(next)
@@ -231,21 +221,19 @@ def check_analytical_solution(solution):
             e_lmdat = np.exp(e_lmda, t)
             e_2lmdat = np.exp(e_lmda, 2 * t)
 
-            left = O @ e_lmdat @ O.T @ Q0
+            left = O @ e_lmdat @ O.T @ q0
             right = left.T
 
             centre = np.linalg.inv(
-                np.eye(...) + 1 / 2 * Q0.T @ O @ (e_2lmdat - np.eye(e_2lmdat.shape[0]) @ lmda_inv @ O.T @ Q0))
+                np.eye(...) + 1 / 2 * q0.T @ O @ (e_2lmdat - np.eye(e_2lmdat.shape[0]) @ lmda_inv @ O.T @ q0))
 
             next = left @ centre @ right
             QQts.append(next)
             w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
 
-
-
     elif solution == '30':
-
         for i in range(1, training_steps):
+            t = i * learning_rate
             e_st = np.exp(s, t / tau)
             e_st_inv = np.linalg.inv(e_st)
             root_A0 = A0 ** 0.5
@@ -266,14 +254,11 @@ def check_analytical_solution(solution):
     elif solution == '37':
         for i in range(1, training_steps):
             t = i * learning_rate
-            e_lmdat = np.exp(e_lmda, t)
-            e_2lmdat = np.exp(e_lmda, 2 * t)
+            e_st = np.exp(s) ** t
             e_st_inv = np.linalg.inv(e_st)
+
             B_inv = np.lianlg.inv(B)
             A0 = ...
-
-            left = O @ e_lmdat @ O.T @ Q0
-            right = left.T
 
             left = np.vstack([
                 V_ @ (np.eye(...) - e_st_inv @ C.T @ np.linalg.inv(B).T @ e_st_inv),
@@ -282,7 +267,8 @@ def check_analytical_solution(solution):
             right = left.T
             centre_left = 4 * e_st_inv @ B_inv @ A0 @ B_inv.T @ e_st_inv
             centre_centre = (np.eye(s.shape[0]) - e_st_inv ** 2) @ np.linalg.inv(s)
-            centre_right = - e_st_inv @ B_inv @ C @ (e_st_inv ** 2 - np.eye(s)) @ np.linalg.inv_s @ C.T @ B_inv.T @ e_st_inv
+            centre_right = - e_st_inv @ B_inv @ C @ (
+                    e_st_inv ** 2 - np.eye(s)) @ np.linalg.inv_s @ C.T @ B_inv.T @ e_st_inv
 
             centre = centre_left + centre_centre + centre_right
 
@@ -290,56 +276,56 @@ def check_analytical_solution(solution):
             QQts.append(next)
             w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
 
-# Now, generate the computational solution
-losses, ws = train_network(train, learning_rate, hidden_dim, out_dim, init_w1, init_w2, training_steps)
+    # Now, generate the computational solution
+    losses, ws = train_network(train, learning_rate, hidden_dim, out_dim, init_w1, init_w2, training_steps)
 
-analytical_output = (np.asarray(ws)[:, 0, :, :] @ X[:plot_items_n].T)
-simulation_output = (np.asarray(w2w1s)[:, 0, :, :] @ X[:plot_items_n].T)
+    analytical_output = (np.asarray(ws)[:, 0, :, :] @ X[:plot_items_n].T)
+    simulation_output = (np.asarray(w2w1s)[:, 0, :, :] @ X[:plot_items_n].T)
 
-print('analytical shape: ', analytical_output.shape)
-print('simulation shape: ', simulation_output.shape)
+    print('analytical shape: ', analytical_output.shape)
+    print('simulation shape: ', simulation_output.shape)
 
-"""
-Plot trajectories of the representations of both
-"""
-rng = np.linspace(0.57, 1., 10)
-# TODO: plot analytical output
+    """
+    Plot trajectories of the representations of both
+    """
+    rng = np.linspace(0.57, 1., 10)
+    # TODO: plot analytical output
 
+    plt.figure()
+    # fig.set_xscale('log')
 
-plt.figure()
-# fig.set_xscale('log')
+    plt.xlabel('Training Steps')
+    plt.title('Simulation Results')
+    # for color, output in zip(blind_colours, simulation_output[1].T):
+    #     for val in output:
+    #         plt.plot(rng, [val]*10, c=color, lw=2.5, clip_on=False, zorder=1)
+    #         plt.plot(rng, [val]*10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
+    plot_matrix_evolution(simulation_output, 4)
 
-plt.xlabel('Training Steps')
-plt.title('Simulation Results')
-# for color, output in zip(blind_colours, simulation_output[1].T):
-#     for val in output:
-#         plt.plot(rng, [val]*10, c=color, lw=2.5, clip_on=False, zorder=1)
-#         plt.plot(rng, [val]*10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
-plot_matrix_evolution(simulation_output, 4)
+    # TODO: plot simulation output
+    for n, (color) in enumerate(blind_colours[:plot_items_n]):
+        plt.plot(-5, -5, c=color, lw=2.5, label=f"Item {n + 1}")
+    plt.plot(-5, -5, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label="Analytical")
 
-# TODO: plot simulation output
-for n, (color) in enumerate(blind_colours[:plot_items_n]):
-    plt.plot(-5, -5, c=color, lw=2.5, label=f"Item {n + 1}")
-plt.plot(-5, -5, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label="Analytical")
+    """
+    Plot difference between analytical and simulation
+    """
+    diff = np.array([m1 - m2 for m1, m2 in zip(analytical_output, simulation_output)])
 
-"""
-Plot difference between analytical and simulation
-"""
-diff = np.array([m1 - m2 for m1, m2 in zip(analytical_output, simulation_output)])
+    plt.figure()
+    plt.title('difference between simulation and analytical')
+    for color, output in zip(blind_colours, diff[1].T):
+        for val in output:
+            plt.plot(rng, [val] * 10, c=color, lw=2.5, clip_on=False, zorder=1)
+            plt.plot(rng, [val] * 10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
 
-plt.figure()
-plt.title('difference between simulation and analytical')
-for color, output in zip(blind_colours, diff[1].T):
-    for val in output:
-        plt.plot(rng, [val] * 10, c=color, lw=2.5, clip_on=False, zorder=1)
-        plt.plot(rng, [val] * 10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
+    plt.show()
 
-plt.show()
+    # print('analytical: ', analytical_output)
+    # print('simulation: ', simulation_output)
+    # print('diff: ', diff)
+    return
 
-# print('analytical: ', analytical_output)
-# print('simulation: ', simulation_output)
-# print('diff: ', diff)
-return
 
 equation_number = input('what equation should we check? Input a number: ')
 check_analytical_solution(equation_number)
