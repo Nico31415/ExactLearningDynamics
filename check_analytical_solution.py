@@ -83,7 +83,6 @@ def check_analytical_solution(solution):
     learning_rate = 0.1
     training_steps = 400
 
-    ##TODO: not sure what to call tau
     tau = 1 / learning_rate
 
     init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, initial_scale)
@@ -115,7 +114,6 @@ def check_analytical_solution(solution):
 
     s = S_ + np.eye(S_.shape[0])
 
-    O = ...
     lmda = np.vstack([
         np.hstack([s, np.zeros(s.shape)]),
         np.hstack([np.zeros(s.shape), s])
@@ -141,11 +139,10 @@ def check_analytical_solution(solution):
             curr = QQts[-1]
 
             derivative = F @ curr + curr @ F - curr @ curr.T
-            next = curr + learning_rate * derivative
-            QQts.append(next)
+            next_val = curr + learning_rate * derivative
+            QQts.append(next_val)
 
-            w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
-
+            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '4':
         for i in range(1, training_steps):
@@ -161,10 +158,10 @@ def check_analytical_solution(solution):
             except:
                 print(i)
                 return
-            next = out @ centre @ out.T
+            next_val = out @ centre @ out.T
 
-            QQts.append(next)
-            w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
+            QQts.append(next_val)
+            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '10':
         for i in range(1, training_steps):
@@ -179,9 +176,9 @@ def check_analytical_solution(solution):
             centre = np.linalg.inv(np.eye(lmda_inv.shape[0]) + 1 / 2 * q0.T @ (
                     O @ e_lmdat @ O.T @ O @ lmda_inv @ O.T @ e_lmdat @ O.T - O @ lmda_inv @ O.T))
 
-            next = left @ centre @ right
-            QQts.append(next)
-            w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
+            next_val = left @ centre @ right
+            QQts.append(next_val)
+            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '12':
         for i in range(1, training_steps):
@@ -194,9 +191,9 @@ def check_analytical_solution(solution):
             centre = np.linalg.inv(np.eye(lmda_inv.shape[0]) + 1 / 2 * q0.T @ (
                     O @ e_lmdat @ lmda_inv @ e_lmdat @ O.T - O @ lmda_inv @ O.T) @ q0)
 
-            next = left @ centre @ right
-            QQts.append(next)
-            w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
+            next_val = left @ centre @ right
+            QQts.append(next_val)
+            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '13':
         for i in range(1, training_steps):
@@ -210,9 +207,9 @@ def check_analytical_solution(solution):
             centre = np.linalg.inv(
                 np.eye(lmda_inv.shape) + 1 / 2 * q0.T @ O @ (e_2lmdat @ lmda_inv - lmda_inv) @ O.T @ q0)
 
-            next = left @ centre @ right
-            QQts.append(next)
-            w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
+            next_val = left @ centre @ right
+            QQts.append(next_val)
+            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
         return
 
     elif solution == '14':
@@ -225,11 +222,13 @@ def check_analytical_solution(solution):
             right = left.T
 
             centre = np.linalg.inv(
-                np.eye(...) + 1 / 2 * q0.T @ O @ (e_2lmdat - np.eye(e_2lmdat.shape[0]) @ lmda_inv @ O.T @ q0))
 
-            next = left @ centre @ right
-            QQts.append(next)
-            w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
+                # TODO: i think the dimensions are correct here, might have to double check
+                np.eye(hidden_dim) + 1 / 2 * q0.T @ O @ (e_2lmdat - np.eye(e_2lmdat.shape[0]) @ lmda_inv @ O.T @ q0))
+
+            next_val = left @ centre @ right
+            QQts.append(next_val)
+            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '30':
         for i in range(1, training_steps):
@@ -237,6 +236,7 @@ def check_analytical_solution(solution):
             e_st = np.exp(s, t / tau)
             e_st_inv = np.linalg.inv(e_st)
             root_A0 = A0 ** 0.5
+            B = U.T @ U_ + V.T @ V_
 
             left = 1 / 2 * np.vstack([
                 V_ @ (e_st @ B.T - e_st_inv @ C.T) @ root_A0 @ R.T,
@@ -245,11 +245,15 @@ def check_analytical_solution(solution):
 
             right = left.T
 
-            centre_centre = ...
+            centre_centre = (B @ (np.exp(e_st, 2) - np.eye(2 * out_dim)) @ lmda_inv @ B.T
+                             - C @ (np.exp(e_st_inv, 2 - np.eye(2 * out_dim)) @ lmda_inv @ C.T))
 
-            centre = np.linalg.inv(np.eye(...) + 1 / 4 @ R @ root_A0 @ centre_centre @ root_A0 @ R.T)
-    ##TODO: i think this one is the hardest to implement
-    ##TODO: A(0), RT
+            centre = np.linalg.inv(np.eye(hidden_dim) + 1 / 4 @ R @ root_A0 @ centre_centre @ root_A0 @ R.T)
+
+            next_val = left @ centre @ right
+            QQts.append(next_val)
+            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+    # TODO: A(0), RT i just made these the identity, not sure if they should be something else
 
     elif solution == '37':
         for i in range(1, training_steps):
@@ -258,23 +262,22 @@ def check_analytical_solution(solution):
             e_st_inv = np.linalg.inv(e_st)
 
             B_inv = np.lianlg.inv(B)
-            A0 = ...
 
             left = np.vstack([
-                V_ @ (np.eye(...) - e_st_inv @ C.T @ np.linalg.inv(B).T @ e_st_inv),
-                U_ @ (np.eye(...) - e_st_inv @ C.T @ np.linalg.inv(B).T @ e_st_inv)
+                V_ @ (np.eye(2*out_dim) - e_st_inv @ C.T @ np.linalg.inv(B).T @ e_st_inv),
+                U_ @ (np.eye(2*out_dim) - e_st_inv @ C.T @ np.linalg.inv(B).T @ e_st_inv)
             ])
             right = left.T
             centre_left = 4 * e_st_inv @ B_inv @ A0 @ B_inv.T @ e_st_inv
             centre_centre = (np.eye(s.shape[0]) - e_st_inv ** 2) @ np.linalg.inv(s)
             centre_right = - e_st_inv @ B_inv @ C @ (
-                    e_st_inv ** 2 - np.eye(s)) @ np.linalg.inv_s @ C.T @ B_inv.T @ e_st_inv
+                    e_st_inv ** 2 - np.eye(s)) @ np.linalg.inv(s) @ C.T @ B_inv.T @ e_st_inv
 
             centre = centre_left + centre_centre + centre_right
 
-            next = left @ centre @ right
-            QQts.append(next)
-            w2w1s.append(np.array([next[-required_shape[0]:, :required_shape[1]]]))
+            next_val = left @ centre @ right
+            QQts.append(next_val)
+            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     # Now, generate the computational solution
     losses, ws = train_network(train, learning_rate, hidden_dim, out_dim, init_w1, init_w2, training_steps)
