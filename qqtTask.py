@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from tools import BlindColours, zero_balanced_weights
+from scipy.linalg import fractional_matrix_power
 
 
 class QQTTask:
@@ -16,6 +17,8 @@ class QQTTask:
                  batch_size,
                  learning_rate,
                  training_steps):
+
+        self.plot_items_n = 4
         self.in_dim = in_dim
         self.hidden_dim = hidden_dim
         self.out_dim = out_dim
@@ -52,6 +55,7 @@ class QQTTask:
         self.U_, self.S_, self.Vt_ = np.linalg.svd(self.sigma_xy)
 
         self.s = self.S_ + np.eye(self.S_.shape[0])
+        self.s_inv = np.linalg.inv(self.s)
 
         self.lmda = np.vstack([
             np.hstack([self.s, np.zeros(self.s.shape)]),
@@ -70,6 +74,9 @@ class QQTTask:
         # temp = np.zeros(self.A0.shape)
 
         self.A0 = np.diag(self.A0)
+        self.rootA0 = fractional_matrix_power(self.A0, 0.5)
+
+
         self.V = self.Vt.T
         self.V_ = self.Vt_.T
         self.B = self.U.T @ self.U_ + self.V.T @ self.V_

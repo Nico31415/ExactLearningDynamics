@@ -67,11 +67,6 @@ def train_network(train, learning_rate, hidden_dim, out_dim, init_w1, init_w2, t
 
     return losses, ws
 
-
-def getw2w1(qqt, required_shape):
-    return qqt[-required_shape[0]:, :required_shape[1]]
-
-
 def check_analytical_solution(solution):
     # takes in solution (string) number on paper "Follow Up Deep Linear Network"
     """
@@ -102,7 +97,7 @@ def check_analytical_solution(solution):
             next_val = curr + qqtTask.learning_rate * derivative
             QQts.append(next_val)
 
-            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            w2w1s.append(qqtTask.getw2w1(next_val))
             # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '4':
@@ -122,7 +117,7 @@ def check_analytical_solution(solution):
             next_val = out @ centre @ out.T
 
             QQts.append(next_val)
-            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            w2w1s.append(qqtTask.getw2w1(next_val))
             # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '10':
@@ -141,7 +136,7 @@ def check_analytical_solution(solution):
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            w2w1s.append(qqtTask.getw2w1(next_val))
             # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '12':
@@ -158,7 +153,7 @@ def check_analytical_solution(solution):
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            w2w1s.append(qqtTask.getw2w1(next_val))
             # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '13':
@@ -179,7 +174,7 @@ def check_analytical_solution(solution):
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            w2w1s.append(qqtTask.getw2w1(next_val))
             # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
         return
 
@@ -202,7 +197,7 @@ def check_analytical_solution(solution):
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            w2w1s.append(qqtTask.getw2w1(next_val))
             # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '30':
@@ -212,12 +207,10 @@ def check_analytical_solution(solution):
             e_st_inv = np.linalg.inv(e_st)
             print('A0 shape: ', qqtTask.A0.shape)
             print('A0: ', qqtTask.A0)
-            root_A0 = fractional_matrix_power(qqtTask.A0, 0.5)
-            s_inv = np.linalg.inv(qqtTask.s)
 
             left = 1 / 2 * np.vstack([
-                qqtTask.V_ @ (e_st @ qqtTask.B.T - e_st_inv @ qqtTask.C.T) @ root_A0 @ qqtTask.R.T,
-                qqtTask.U_ @ (e_st @ qqtTask.B.T + e_st_inv @ qqtTask.C.T) @ root_A0 @ qqtTask.R.T,
+                qqtTask.V_ @ (e_st @ qqtTask.B.T - e_st_inv @ qqtTask.C.T) @ qqtTask.rootA0 @ qqtTask.R.T,
+                qqtTask.U_ @ (e_st @ qqtTask.B.T + e_st_inv @ qqtTask.C.T) @ qqtTask.rootA0 @ qqtTask.R.T,
             ])
 
             right = left.T
@@ -236,25 +229,52 @@ def check_analytical_solution(solution):
             # second = qqtTask.C @ (fractional_matrix_power(e_st, 2) - np.eye(qqtTask.out_dim)) @ s_inv @ qqtTask.C.T
             # print('second done: ', second)
             centre_centre = (
-                    qqtTask.B @ (fractional_matrix_power(e_st, 2) - np.eye(qqtTask.out_dim)) @ s_inv @ qqtTask.B.T
-                    - qqtTask.C @ (fractional_matrix_power(e_st_inv, 2) - np.eye(qqtTask.out_dim)) @ s_inv @ qqtTask.C.T)
+                    qqtTask.B @ (fractional_matrix_power(e_st, 2) - np.eye(qqtTask.out_dim)) @ qqtTask.s_inv @ qqtTask.B.T
+                    - qqtTask.C @ (fractional_matrix_power(e_st_inv, 2) - np.eye(qqtTask.out_dim)) @ qqtTask.s_inv @ qqtTask.C.T)
 
             print('R shape: ', qqtTask.R.shape)
-            print('A0 shape: ', root_A0.shape)
+            print('A0 shape: ', qqtTask.root_A0.shape)
             print('centre centre shape: ', centre_centre.shape)
             print('hidden_dim: ', qqtTask.hidden_dim)
 
 
-            temp = qqtTask.R @ root_A0 @ centre_centre @ root_A0 @ qqtTask.R.T
+            temp = qqtTask.R @ qqtTask.root_A0 @ centre_centre @ qqtTask.root_A0 @ qqtTask.R.T
             print('temp shape: ', temp.shape)
             centre = np.linalg.inv(np.eye(qqtTask.out_dim) +
-                                   1 / 4 * qqtTask.R @ root_A0 @ centre_centre @ root_A0 @ qqtTask.R.T)
+                                   1 / 4 * qqtTask.R @ qqtTask.root_A0 @ centre_centre @ qqtTask.root_A0 @ qqtTask.R.T)
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            w2w1s.append(qqtTask.getw2w1(next_val))
             # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
     # TODO: A(0), RT i just made these the identity, not sure if they should be something else
+
+    elif solution == '33':
+        for i in range(1, qqtTask.training_steps):
+            t = i * qqtTask.learning_rate
+            e_st = fractional_matrix_power(qqtTask.s, t / qqtTask.tau)
+            e_st_inv = np.linalg.inv(e_st)
+
+            left = 1 / 2 * np.vstack([
+                qqtTask.V_ @ (e_st @ qqtTask.B.T - e_st_inv @ qqtTask.C.T) @ qqtTask.root_A0 @ qqtTask.R.T,
+                qqtTask.U_ @ (e_st @ qqtTask.B.T + e_st_inv @ qqtTask.C.T) @ qqtTask.root_A0 @ qqtTask.R.T,
+            ])
+
+            centre_centre = (qqtTask.B @ (fractional_matrix_power(e_st, 2) - np.eye(qqtTask.in_dim))
+                                                   @ qqtTask.s_inv @ qqtTask.B.T)
+
+            centre_right = (qqtTask.C @ (fractional_matrix_power(e_st_inv, 2) - np.eye(qqtTask.in_dim))
+                                                   @ qqtTask.s_inv @ qqtTask.C.T)
+
+            centre = np.linalg.inv(
+                np.linalg.inv(qqtTask.A0) + 1/4 * (centre_centre - centre_right)
+            )
+
+            right = left.T
+
+            next_val = left @ centre @ right
+            QQts.append(next_val)
+            w2w1s.append(qqtTask.getw2w1(next_val))
 
     elif solution == '37':
         for i in range(1, qqtTask.training_steps):
@@ -280,7 +300,7 @@ def check_analytical_solution(solution):
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            w2w1s.append(qqtTask.getw2w1(next_val))
             # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     # Now, generate the computational solution
