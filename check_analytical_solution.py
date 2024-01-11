@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from tools import BlindColours, zero_balanced_weights
+from scipy.linalg import fractional_matrix_power
 from qqtTask import QQTTask
 
 
@@ -163,14 +164,16 @@ def check_analytical_solution(solution):
     elif solution == '13':
         for i in range(1, qqtTask.training_steps):
             t = i * qqtTask.learning_rate
-            e_lmdat = qqtTask.e_lmda ** t
-            e_2lmdat = qqtTask.e_lmda ** (2 * t)
+            print('t: ', t)
+            print('e_lmda: ', qqtTask.e_lmda)
+            e_lmdat = fractional_matrix_power(qqtTask.e_lmda, t)
+            e_2lmdat = fractional_matrix_power(qqtTask.e_lmda, 2 * t)
 
             left = qqtTask.O @ e_lmdat @ qqtTask.O.T @ qqtTask.q0
             right = left.T
 
             centre = np.linalg.inv(
-                np.eye(qqtTask.lmda_inv.shape) +
+                np.eye(qqtTask.lmda_inv.shape[0]) +
                 1 / 2 * (qqtTask.q0.T @ qqtTask.O @
                          (e_2lmdat @ qqtTask.lmda_inv - qqtTask.lmda_inv) @ qqtTask.O.T @ qqtTask.q0))
 
@@ -183,8 +186,8 @@ def check_analytical_solution(solution):
     elif solution == '14':
         for i in range(1, qqtTask.training_steps):
             t = i * qqtTask.learning_rate
-            e_lmdat = np.exp(qqtTask.e_lmda, t)
-            e_2lmdat = np.exp(qqtTask.e_lmda, 2 * t)
+            e_lmdat = fractional_matrix_power(qqtTask.e_lmda, t)
+            e_2lmdat = fractional_matrix_power(qqtTask.e_lmda, 2 * t)
 
             left = qqtTask.O @ e_lmdat @ qqtTask.O.T @ qqtTask.q0
             right = left.T
@@ -205,9 +208,12 @@ def check_analytical_solution(solution):
     elif solution == '30':
         for i in range(1, qqtTask.training_steps):
             t = i * qqtTask.learning_rate
-            e_st = np.exp(qqtTask.s, t / qqtTask.tau)
+            e_st = fractional_matrix_power(qqtTask.s, t / qqtTask.tau)
             e_st_inv = np.linalg.inv(e_st)
-            root_A0 = qqtTask.A0 ** 0.5
+            print('A0 shape: ', qqtTask.A0.shape)
+            print('A0: ', qqtTask.A0)
+            root_A0 = fractional_matrix_power(qqtTask.A0, 0.5)
+            s_inv = np.linalg.inv(qqtTask.s)
 
             left = 1 / 2 * np.vstack([
                 qqtTask.V_ @ (e_st @ qqtTask.B.T - e_st_inv @ qqtTask.C.T) @ root_A0 @ qqtTask.R.T,
@@ -216,12 +222,32 @@ def check_analytical_solution(solution):
 
             right = left.T
 
-            centre_centre = (
-                        qqtTask.B @ (np.exp(e_st, 2) - np.eye(2 * qqtTask.out_dim)) @ qqtTask.lmda_inv @ qqtTask.B.T
-                        - qqtTask.C @ (np.exp(e_st_inv,
-                                              2 - np.eye(2 * qqtTask.out_dim)) @ qqtTask.lmda_inv @ qqtTask.C.T))
+            print('B shape: ', qqtTask.B.shape)
+            print('e_st shape: ', e_st.shape)
+            print('C shape: ', qqtTask.C.shape)
+            print('lmda_inv shape: ', qqtTask.lmda_inv.shape)
 
-            centre = np.linalg.inv(np.eye(qqtTask.hidden_dim) +
+            # TODO: instead of using lmda_inv im going to use s_inv
+            # so dimensions match, I think this is what is meant in the paper
+
+            # first = qqtTask.B @ (fractional_matrix_power(e_st, 2) - np.eye(qqtTask.out_dim)) @ s_inv @ qqtTask.B.T
+            # print('first done: ', first)
+            #
+            # second = qqtTask.C @ (fractional_matrix_power(e_st, 2) - np.eye(qqtTask.out_dim)) @ s_inv @ qqtTask.C.T
+            # print('second done: ', second)
+            centre_centre = (
+                    qqtTask.B @ (fractional_matrix_power(e_st, 2) - np.eye(qqtTask.out_dim)) @ s_inv @ qqtTask.B.T
+                    - qqtTask.C @ (fractional_matrix_power(e_st_inv, 2) - np.eye(qqtTask.out_dim)) @ s_inv @ qqtTask.C.T)
+
+            print('R shape: ', qqtTask.R.shape)
+            print('A0 shape: ', root_A0.shape)
+            print('centre centre shape: ', centre_centre.shape)
+            print('hidden_dim: ', qqtTask.hidden_dim)
+
+
+            temp = qqtTask.R @ root_A0 @ centre_centre @ root_A0 @ qqtTask.R.T
+            print('temp shape: ', temp.shape)
+            centre = np.linalg.inv(np.eye(qqtTask.out_dim) +
                                    1 / 4 * qqtTask.R @ root_A0 @ centre_centre @ root_A0 @ qqtTask.R.T)
 
             next_val = left @ centre @ right
@@ -236,19 +262,19 @@ def check_analytical_solution(solution):
             e_st = np.exp(qqtTask.s) ** t
             e_st_inv = np.linalg.inv(e_st)
 
-            B_inv = np.lianlg.inv(qqtTask.B)
+            B_inv = np.linalg.inv(qqtTask.B)
 
             left = np.vstack([
-                qqtTask.V_ @ (np.eye(2 * qqtTask.out_dim)
+                qqtTask.V_ @ (np.eye(qqtTask.out_dim)
                               - e_st_inv @ qqtTask.C.T @ np.linalg.inv(qqtTask.B).T @ e_st_inv),
-                qqtTask.U_ @ (np.eye(2 * qqtTask.out_dim)
+                qqtTask.U_ @ (np.eye(qqtTask.out_dim)
                               - e_st_inv @ qqtTask.C.T @ np.linalg.inv(qqtTask.B).T @ e_st_inv)
             ])
             right = left.T
             centre_left = 4 * e_st_inv @ B_inv @ qqtTask.A0 @ B_inv.T @ e_st_inv
             centre_centre = (np.eye(qqtTask.s.shape[0]) - e_st_inv ** 2) @ np.linalg.inv(qqtTask.s)
             centre_right = - e_st_inv @ B_inv @ qqtTask.C @ (
-                    e_st_inv ** 2 - np.eye(qqtTask.s)) @ np.linalg.inv(qqtTask.s) @ qqtTask.C.T @ B_inv.T @ e_st_inv
+                    fractional_matrix_power(e_st_inv, 2) - np.eye(qqtTask.in_dim)) @ np.linalg.inv(qqtTask.s) @ qqtTask.C.T @ B_inv.T @ e_st_inv
 
             centre = centre_left + centre_centre + centre_right
 
@@ -258,7 +284,6 @@ def check_analytical_solution(solution):
             # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     # Now, generate the computational solution
-    print(qqtTask.train)
     losses, ws = train_network(qqtTask.train,
                                qqtTask.learning_rate,
                                qqtTask.hidden_dim,
@@ -267,8 +292,8 @@ def check_analytical_solution(solution):
                                qqtTask.init_w2,
                                qqtTask.training_steps)
 
-    analytical_output = (np.asarray(ws)[:, 0, :, :] @ qqtTask.X[:qqtTask.plot_items_n].T)
-    simulation_output = (np.asarray(w2w1s)[:, 0, :, :] @ qqtTask.X[:qqtTask.plot_items_n].T)
+    analytical_output = (np.asarray(w2w1s)[:, 0, :, :] @ qqtTask.X[:qqtTask.plot_items_n].T)
+    simulation_output = (np.asarray(ws)[:, 0, :, :] @ qqtTask.X[:qqtTask.plot_items_n].T)
 
     print('analytical shape: ', analytical_output.shape)
     print('simulation shape: ', simulation_output.shape)

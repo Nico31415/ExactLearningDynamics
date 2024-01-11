@@ -32,10 +32,7 @@ class QQTTask:
 
         # TODO: don't really understand this part
         (self.X, self.Y) = self.train(None)
-        self.train = (self.X, self.Y)
-
-        self.plot_items_n = 4
-        self.blind_colours = BlindColours().get_colours()
+        # self.train = (self.X, self.Y)
         self.c = 0
 
         self.q0 = np.vstack([self.init_w1.T,
@@ -70,6 +67,9 @@ class QQTTask:
         self.e_lmda = np.diag(self.evals)
 
         self.U, self.A0, self.Vt = np.linalg.svd(self.init_w2 @ self.init_w1)
+        # temp = np.zeros(self.A0.shape)
+
+        self.A0 = np.diag(self.A0)
         self.V = self.Vt.T
         self.V_ = self.Vt_.T
         self.B = self.U.T @ self.U_ + self.V.T @ self.V_
