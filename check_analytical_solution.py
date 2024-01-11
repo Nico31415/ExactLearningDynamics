@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from tools import BlindColours, zero_balanced_weights
+from qqtTask import QQTTask
 
 
 def plot_matrix_evolution(matrix_list, n_components):
@@ -40,6 +41,7 @@ def plot_matrix_evolution(matrix_list, n_components):
     plt.show()
 
 
+# generates the computational solution using gradient descent
 def train_network(train, learning_rate, hidden_dim, out_dim, init_w1, init_w2, training_steps):
     # Generate the computational solution
     task = gs.tasks.FullBatchLearning(train)
@@ -65,7 +67,12 @@ def train_network(train, learning_rate, hidden_dim, out_dim, init_w1, init_w2, t
     return losses, ws
 
 
+def getw2w1(qqt, required_shape):
+    return qqt[-required_shape[0]:, :required_shape[1]]
+
+
 def check_analytical_solution(solution):
+    # takes in solution (string) number on paper "Follow Up Deep Linear Network"
     """
     Checks analytical solution from paper against computational result.
     Input: number of equation on the paper
@@ -74,216 +81,194 @@ def check_analytical_solution(solution):
 
     4: exponent stuff, doesn't converge well
     """
-    in_dim = 5
-    hidden_dim = 10
-    out_dim = 5
-    initial_scale = 0.35
 
-    batch_size = 10
-    learning_rate = 0.1
-    training_steps = 400
+    qqtTask = QQTTask(in_dim=5,
+                      hidden_dim=10,
+                      out_dim=5,
+                      initial_scale=0.35,
+                      batch_size=10,
+                      learning_rate=0.1,
+                      training_steps=400)
 
-    tau = 1 / learning_rate
-
-    init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, initial_scale)
-    train, _, _ = gs.datasets.StudentTeacher(batch_size, [init_w1, init_w2], [gs.datasets.Whiten()])
-
-    (X, Y) = train(None)
-    train = (X, Y)
-
-    plot_items_n = 4
-    blind_colours = BlindColours().get_colours()
-    c = 0
-
-    q0 = np.vstack([init_w1.T, init_w2])
-
-    qqt0 = q0 @ q0.T
-
-    sigma_xy = Y.T @ X
-
-    F = np.vstack([
-        np.hstack([c / 2 * np.eye(sigma_xy.shape[1]), sigma_xy.T]),
-        np.hstack([sigma_xy, c / 2 * np.eye(sigma_xy.shape[0])])
-    ])
-
-    required_shape = (init_w2 @ init_w1).shape
-    QQts = [qqt0]
-    w2w1s = [[qqt0[-required_shape[0]:, :required_shape[1]]]]
-
-    U_, S_, Vt_ = np.linalg.svd(sigma_xy)
-
-    s = S_ + np.eye(S_.shape[0])
-
-    lmda = np.vstack([
-        np.hstack([s, np.zeros(s.shape)]),
-        np.hstack([np.zeros(s.shape), s])
-    ])
-
-    lmda_inv = np.linalg.inv(lmda)
-
-    e_f = np.exp(1 / tau * F)
-
-    evals, evecs = np.linalg.eig(e_f)
-    O = evecs
-    e_lmda = np.diag(evals)
-
-    U, A0, Vt = np.linalg.svd(init_w2 @ init_w1)
-    V = Vt.T
-    V_ = Vt_.T
-    B = U.T @ U_ + V.T @ V_
-    C = U.T @ U_ - V.T @ V_
-    R = np.identity(A0.shape[0])
+    QQts = [qqtTask.qqt0]
+    w2w1s = [qqtTask.getw2w1(qqtTask.qqt0)]
 
     if solution == '3':
-        for i in range(1, training_steps):
+        for i in range(1, qqtTask.training_steps):
             curr = QQts[-1]
 
-            derivative = F @ curr + curr @ F - curr @ curr.T
-            next_val = curr + learning_rate * derivative
+            derivative = qqtTask.F @ curr + curr @ qqtTask.F - curr @ curr.T
+            next_val = curr + qqtTask.learning_rate * derivative
             QQts.append(next_val)
 
-            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '4':
-        for i in range(1, training_steps):
+        for i in range(1, qqtTask.training_steps):
             tau = 1
-            t = i * learning_rate
-            e_ft = np.exp(t / tau * F)
+            t = i * qqtTask.learning_rate
+            e_ft = np.exp(t / tau * qqtTask.F)
 
-            out = e_ft @ q0
-            centre_centre = e_ft @ np.linalg.inv(F) @ e_ft - np.linalg.inv(F)
+            out = e_ft @ qqtTask.q0
+            centre_centre = e_ft @ np.linalg.inv(qqtTask.F) @ e_ft - np.linalg.inv(qqtTask.F)
             # print(np.eye(F.shape[0]) + 1/2 * q0.T @ centre_centre @ q0)
             try:
-                centre = np.linalg.inv(np.eye(F.shape[0]) + 1 / 2 * q0.T @ centre_centre @ q0)
+                centre = np.linalg.inv(np.eye(qqtTask.F.shape[0]) + 1 / 2 * qqtTask.q0.T @ centre_centre @ qqtTask.q0)
             except:
                 print(i)
                 return
             next_val = out @ centre @ out.T
 
             QQts.append(next_val)
-            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '10':
-        for i in range(1, training_steps):
-            t = i * learning_rate
-            print(e_lmda)
+        for i in range(1, qqtTask.training_steps):
+            t = i * qqtTask.learning_rate
+            print(qqtTask.e_lmda)
             print(t)
-            e_lmdat = e_lmda ** t
+            e_lmdat = qqtTask.e_lmda ** t
 
-            left = O @ e_lmdat @ O.T @ q0
+            left = qqtTask.O @ e_lmdat @ qqtTask.O.T @ qqtTask.q0
             right = left.T
 
-            centre = np.linalg.inv(np.eye(lmda_inv.shape[0]) + 1 / 2 * q0.T @ (
-                    O @ e_lmdat @ O.T @ O @ lmda_inv @ O.T @ e_lmdat @ O.T - O @ lmda_inv @ O.T))
+            centre = np.linalg.inv(np.eye(qqtTask.lmda_inv.shape[0]) + 1 / 2 * qqtTask.q0.T @ (
+                    qqtTask.O @ e_lmdat @ qqtTask.O.T @ qqtTask.O @ qqtTask.lmda_inv @ qqtTask.O.T @ e_lmdat
+                    @ qqtTask.O.T - qqtTask.O @ qqtTask.lmda_inv @ qqtTask.O.T))
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '12':
-        for i in range(1, training_steps):
-            t = i * learning_rate
-            e_lmdat = e_lmda ** t
+        for i in range(1, qqtTask.training_steps):
+            t = i * qqtTask.learning_rate
+            e_lmdat = qqtTask.e_lmda ** t
 
-            left = O @ e_lmdat @ O.T @ q0
+            left = qqtTask.O @ e_lmdat @ qqtTask.O.T @ qqtTask.q0
             right = left.T
 
-            centre = np.linalg.inv(np.eye(lmda_inv.shape[0]) + 1 / 2 * q0.T @ (
-                    O @ e_lmdat @ lmda_inv @ e_lmdat @ O.T - O @ lmda_inv @ O.T) @ q0)
+            centre = np.linalg.inv(np.eye(qqtTask.lmda_inv.shape[0]) + 1 / 2 * qqtTask.q0.T @ (
+                    qqtTask.O @ e_lmdat @ qqtTask.lmda_inv @ e_lmdat @ qqtTask.O.T
+                    - qqtTask.O @ qqtTask.lmda_inv @ qqtTask.O.T) @ qqtTask.q0)
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '13':
-        for i in range(1, training_steps):
-            t = i * learning_rate
-            e_lmdat = e_lmda ** t
-            e_2lmdat = e_lmda ** (2 * t)
+        for i in range(1, qqtTask.training_steps):
+            t = i * qqtTask.learning_rate
+            e_lmdat = qqtTask.e_lmda ** t
+            e_2lmdat = qqtTask.e_lmda ** (2 * t)
 
-            left = O @ e_lmdat @ O.T @ q0
+            left = qqtTask.O @ e_lmdat @ qqtTask.O.T @ qqtTask.q0
             right = left.T
 
             centre = np.linalg.inv(
-                np.eye(lmda_inv.shape) + 1 / 2 * q0.T @ O @ (e_2lmdat @ lmda_inv - lmda_inv) @ O.T @ q0)
+                np.eye(qqtTask.lmda_inv.shape) +
+                1 / 2 * (qqtTask.q0.T @ qqtTask.O @
+                         (e_2lmdat @ qqtTask.lmda_inv - qqtTask.lmda_inv) @ qqtTask.O.T @ qqtTask.q0))
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
         return
 
     elif solution == '14':
-        for i in range(1, training_steps):
-            t = i * learning_rate
-            e_lmdat = np.exp(e_lmda, t)
-            e_2lmdat = np.exp(e_lmda, 2 * t)
+        for i in range(1, qqtTask.training_steps):
+            t = i * qqtTask.learning_rate
+            e_lmdat = np.exp(qqtTask.e_lmda, t)
+            e_2lmdat = np.exp(qqtTask.e_lmda, 2 * t)
 
-            left = O @ e_lmdat @ O.T @ q0
+            left = qqtTask.O @ e_lmdat @ qqtTask.O.T @ qqtTask.q0
             right = left.T
 
             centre = np.linalg.inv(
 
                 # TODO: i think the dimensions are correct here, might have to double check
-                np.eye(hidden_dim) + 1 / 2 * q0.T @ O @ (e_2lmdat - np.eye(e_2lmdat.shape[0]) @ lmda_inv @ O.T @ q0))
+                np.eye(qqtTask.hidden_dim) +
+                1 / 2 * (qqtTask.q0.T @ qqtTask.O @
+                         (e_2lmdat - np.eye(e_2lmdat.shape[0]) @ qqtTask.lmda_inv @ qqtTask.O.T @ qqtTask.q0))
+            )
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '30':
-        for i in range(1, training_steps):
-            t = i * learning_rate
-            e_st = np.exp(s, t / tau)
+        for i in range(1, qqtTask.training_steps):
+            t = i * qqtTask.learning_rate
+            e_st = np.exp(qqtTask.s, t / qqtTask.tau)
             e_st_inv = np.linalg.inv(e_st)
-            root_A0 = A0 ** 0.5
-            B = U.T @ U_ + V.T @ V_
+            root_A0 = qqtTask.A0 ** 0.5
 
             left = 1 / 2 * np.vstack([
-                V_ @ (e_st @ B.T - e_st_inv @ C.T) @ root_A0 @ R.T,
-                U_ @ (e_st @ B.T + e_st_inv @ C.T) @ root_A0 @ R.T,
+                qqtTask.V_ @ (e_st @ qqtTask.B.T - e_st_inv @ qqtTask.C.T) @ root_A0 @ qqtTask.R.T,
+                qqtTask.U_ @ (e_st @ qqtTask.B.T + e_st_inv @ qqtTask.C.T) @ root_A0 @ qqtTask.R.T,
             ])
 
             right = left.T
 
-            centre_centre = (B @ (np.exp(e_st, 2) - np.eye(2 * out_dim)) @ lmda_inv @ B.T
-                             - C @ (np.exp(e_st_inv, 2 - np.eye(2 * out_dim)) @ lmda_inv @ C.T))
+            centre_centre = (
+                        qqtTask.B @ (np.exp(e_st, 2) - np.eye(2 * qqtTask.out_dim)) @ qqtTask.lmda_inv @ qqtTask.B.T
+                        - qqtTask.C @ (np.exp(e_st_inv,
+                                              2 - np.eye(2 * qqtTask.out_dim)) @ qqtTask.lmda_inv @ qqtTask.C.T))
 
-            centre = np.linalg.inv(np.eye(hidden_dim) + 1 / 4 @ R @ root_A0 @ centre_centre @ root_A0 @ R.T)
+            centre = np.linalg.inv(np.eye(qqtTask.hidden_dim) +
+                                   1 / 4 * qqtTask.R @ root_A0 @ centre_centre @ root_A0 @ qqtTask.R.T)
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
     # TODO: A(0), RT i just made these the identity, not sure if they should be something else
 
     elif solution == '37':
-        for i in range(1, training_steps):
-            t = i * learning_rate
-            e_st = np.exp(s) ** t
+        for i in range(1, qqtTask.training_steps):
+            t = i * qqtTask.learning_rate
+            e_st = np.exp(qqtTask.s) ** t
             e_st_inv = np.linalg.inv(e_st)
 
-            B_inv = np.lianlg.inv(B)
+            B_inv = np.lianlg.inv(qqtTask.B)
 
             left = np.vstack([
-                V_ @ (np.eye(2*out_dim) - e_st_inv @ C.T @ np.linalg.inv(B).T @ e_st_inv),
-                U_ @ (np.eye(2*out_dim) - e_st_inv @ C.T @ np.linalg.inv(B).T @ e_st_inv)
+                qqtTask.V_ @ (np.eye(2 * qqtTask.out_dim)
+                              - e_st_inv @ qqtTask.C.T @ np.linalg.inv(qqtTask.B).T @ e_st_inv),
+                qqtTask.U_ @ (np.eye(2 * qqtTask.out_dim)
+                              - e_st_inv @ qqtTask.C.T @ np.linalg.inv(qqtTask.B).T @ e_st_inv)
             ])
             right = left.T
-            centre_left = 4 * e_st_inv @ B_inv @ A0 @ B_inv.T @ e_st_inv
-            centre_centre = (np.eye(s.shape[0]) - e_st_inv ** 2) @ np.linalg.inv(s)
-            centre_right = - e_st_inv @ B_inv @ C @ (
-                    e_st_inv ** 2 - np.eye(s)) @ np.linalg.inv(s) @ C.T @ B_inv.T @ e_st_inv
+            centre_left = 4 * e_st_inv @ B_inv @ qqtTask.A0 @ B_inv.T @ e_st_inv
+            centre_centre = (np.eye(qqtTask.s.shape[0]) - e_st_inv ** 2) @ np.linalg.inv(qqtTask.s)
+            centre_right = - e_st_inv @ B_inv @ qqtTask.C @ (
+                    e_st_inv ** 2 - np.eye(qqtTask.s)) @ np.linalg.inv(qqtTask.s) @ qqtTask.C.T @ B_inv.T @ e_st_inv
 
             centre = centre_left + centre_centre + centre_right
 
             next_val = left @ centre @ right
             QQts.append(next_val)
-            w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+            w2w1s.append(getw2w1(next_val, qqtTask.required_shape))
+            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     # Now, generate the computational solution
-    losses, ws = train_network(train, learning_rate, hidden_dim, out_dim, init_w1, init_w2, training_steps)
+    print(qqtTask.train)
+    losses, ws = train_network(qqtTask.train,
+                               qqtTask.learning_rate,
+                               qqtTask.hidden_dim,
+                               qqtTask.out_dim,
+                               qqtTask.init_w1,
+                               qqtTask.init_w2,
+                               qqtTask.training_steps)
 
-    analytical_output = (np.asarray(ws)[:, 0, :, :] @ X[:plot_items_n].T)
-    simulation_output = (np.asarray(w2w1s)[:, 0, :, :] @ X[:plot_items_n].T)
+    analytical_output = (np.asarray(ws)[:, 0, :, :] @ qqtTask.X[:qqtTask.plot_items_n].T)
+    simulation_output = (np.asarray(w2w1s)[:, 0, :, :] @ qqtTask.X[:qqtTask.plot_items_n].T)
 
     print('analytical shape: ', analytical_output.shape)
     print('simulation shape: ', simulation_output.shape)
@@ -306,7 +291,7 @@ def check_analytical_solution(solution):
     plot_matrix_evolution(simulation_output, 4)
 
     # TODO: plot simulation output
-    for n, (color) in enumerate(blind_colours[:plot_items_n]):
+    for n, (color) in enumerate(qqtTask.blind_colours[:qqtTask.plot_items_n]):
         plt.plot(-5, -5, c=color, lw=2.5, label=f"Item {n + 1}")
     plt.plot(-5, -5, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label="Analytical")
 
@@ -317,7 +302,7 @@ def check_analytical_solution(solution):
 
     plt.figure()
     plt.title('difference between simulation and analytical')
-    for color, output in zip(blind_colours, diff[1].T):
+    for color, output in zip(qqtTask.blind_colours, diff[1].T):
         for val in output:
             plt.plot(rng, [val] * 10, c=color, lw=2.5, clip_on=False, zorder=1)
             plt.plot(rng, [val] * 10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
