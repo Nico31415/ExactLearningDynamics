@@ -42,12 +42,12 @@ def plot_matrix_evolution(matrix_list, n_components):
     plt.show()
 
 
-# generates the computational solution using gradient descent
 def train_network(train, learning_rate, in_dim, hidden_dim, out_dim, init_w1, init_w2, training_steps):
-    # Generate the computational solution
     task = gs.tasks.FullBatchLearning(train)
     optimiser = gs.GradientDescent(learning_rate)
     loss = gs.MeanSquaredError()
+
+    init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.5)
 
     mlp = gs.Network([
         gs.Linear(hidden_dim, bias=False, weight_init=gs.init.FromFixedValue(init_w1)),
@@ -56,29 +56,53 @@ def train_network(train, learning_rate, in_dim, hidden_dim, out_dim, init_w1, in
 
     trainer = gs.Trainer(task, mlp, loss, optimiser)
     state, params = gs.assemble(1)
-
     losses = []
+    ws = []
 
-    ws = np.zeros((training_steps, in_dim, out_dim))
-    ws[0] = params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"]
-    # ws = params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"]
+    ws = [params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"]]
 
-
-
-
-    for training_step in range(training_steps - 1):
-        print('step: ', training_step)
-        state, params, current_loss = trainer(state, params)
-        losses.append(current_loss)
-        # ws.append(params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"])
-        print(params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"])
-        ws[training_step+1] = params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"]
-        # np.append(ws, params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"])
+    for training_step in range(training_steps):
+        state, params, loss = trainer(state, params)
+        losses.append(loss)
+        ws.append(params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"])
 
     return losses, ws
 
 
-def check_analytical_solution(solution):
+# generates the computational solution using gradient descent
+# def train_network(train, learning_rate, in_dim, hidden_dim, out_dim, init_w1, init_w2, training_steps):
+#     # Generate the computational solution
+#     task = gs.tasks.FullBatchLearning(train)
+#     optimiser = gs.GradientDescent(learning_rate)
+#     loss = gs.MeanSquaredError()
+#
+#     mlp = gs.Network([
+#         gs.Linear(hidden_dim, bias=False, weight_init=gs.init.FromFixedValue(init_w1)),
+#         gs.Linear(out_dim, bias=False, weight_init=gs.init.FromFixedValue(init_w2))
+#     ])
+#
+#     trainer = gs.Trainer(task, mlp, loss, optimiser)
+#     state, params = gs.assemble(1)
+#
+#     losses = []
+#
+#     ws = np.zeros((training_steps, in_dim, out_dim))
+#     ws[0] = params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"]
+#     # ws = params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"]
+#
+#     for training_step in range(training_steps - 1):
+#         # print('step: ', training_step)
+#         state, params, current_loss = trainer(state, params)
+#         losses.append(current_loss)
+#         # ws.append(params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"])
+#         # print(params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"])
+#         ws[training_step + 1] = params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"]
+#         # np.append(ws, params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"])
+#
+#     return losses, ws
+
+
+def check_analytical_solution(solution, qqtTask):
     # takes in solution (string) number on paper "Follow Up Deep Linear Network"
     """
     Checks analytical solution from paper against computational result.
@@ -89,16 +113,9 @@ def check_analytical_solution(solution):
     4: exponent stuff, doesn't converge well
     """
 
-    qqtTask = QQTTask(in_dim=3,
-                      hidden_dim=4,
-                      out_dim=3,
-                      initial_scale=0.35,
-                      batch_size=10,
-                      learning_rate=0.1,
-                      training_steps=400)
-
     QQts = [qqtTask.qqt0]
     w2w1s = [qqtTask.getw2w1(qqtTask.qqt0)]
+    losses = []
 
     if solution == '3':
         for i in range(1, qqtTask.training_steps):
@@ -109,7 +126,18 @@ def check_analytical_solution(solution):
             QQts.append(next_val)
 
             w2w1s.append(qqtTask.getw2w1(next_val))
-            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
+
+            curr_weight = w2w1s[-1]
+
+            print('Dimensions Y: ', qqtTask.Y.shape)
+            print('Dimensions curr weight: ', curr_weight.shape)
+            print('Dimensions task X: ', qqtTask.X.shape)
+
+            # fitted = curr_weight @ qqtTask.X
+            #
+            # print('Dimensions fitted Y: ', fitted.shape)
+            loss = (1 / 2) * np.linalg.norm(qqtTask.Y - np.matmul(qqtTask.X, curr_weight)) ** 2
+            losses.append(loss)
 
     elif solution == '4':
         for i in range(1, qqtTask.training_steps):
@@ -118,18 +146,19 @@ def check_analytical_solution(solution):
             e_ft = np.exp(t / tau * qqtTask.F)
 
             out = e_ft @ qqtTask.q0
-            centre_centre = e_ft @ np.linalg.inv(qqtTask.F) @ e_ft - np.linalg.inv(qqtTask.F)
-            # print(np.eye(F.shape[0]) + 1/2 * q0.T @ centre_centre @ q0)
-            try:
-                centre = np.linalg.inv(np.eye(qqtTask.F.shape[0]) + 1 / 2 * qqtTask.q0.T @ centre_centre @ qqtTask.q0)
-            except:
-                print(i)
-                return
+            centre_centre_centre = (e_ft @ np.linalg.inv(qqtTask.F) @ e_ft - np.linalg.inv(qqtTask.F))
+            centre_centre = (1 / 2 * qqtTask.q0 @ centre_centre_centre @ qqtTask.q0)
+            print('centre centre shape: ', centre_centre.shape)
+            centre = np.linalg.inv(np.eye(centre_centre.shape[0]) + centre_centre)
+            # try:
+            #     centre = np.linalg.inv(np.eye(qqtTask.F.shape[0]) + 1 / 2 * qqtTask.q0.T @ centre_centre @ qqtTask.q0)
+            # except:
+            #     print(i)
+            #     break
             next_val = out @ centre @ out.T
 
             QQts.append(next_val)
             w2w1s.append(qqtTask.getw2w1(next_val))
-            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '10':
         for i in range(1, qqtTask.training_steps):
@@ -148,7 +177,6 @@ def check_analytical_solution(solution):
             next_val = left @ centre @ right
             QQts.append(next_val)
             w2w1s.append(qqtTask.getw2w1(next_val))
-            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '12':
         for i in range(1, qqtTask.training_steps):
@@ -165,7 +193,6 @@ def check_analytical_solution(solution):
             next_val = left @ centre @ right
             QQts.append(next_val)
             w2w1s.append(qqtTask.getw2w1(next_val))
-            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '13':
         for i in range(1, qqtTask.training_steps):
@@ -186,7 +213,6 @@ def check_analytical_solution(solution):
             next_val = left @ centre @ right
             QQts.append(next_val)
             w2w1s.append(qqtTask.getw2w1(next_val))
-            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
         return
 
     elif solution == '14':
@@ -209,7 +235,6 @@ def check_analytical_solution(solution):
             next_val = left @ centre @ right
             QQts.append(next_val)
             w2w1s.append(qqtTask.getw2w1(next_val))
-            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
     elif solution == '30':
         for i in range(1, qqtTask.training_steps):
@@ -241,7 +266,7 @@ def check_analytical_solution(solution):
             # print('second done: ', second)
             centre_centre = (
                     qqtTask.B @ (
-                        fractional_matrix_power(e_st, 2) - np.eye(qqtTask.out_dim)) @ qqtTask.s_inv @ qqtTask.B.T
+                    fractional_matrix_power(e_st, 2) - np.eye(qqtTask.out_dim)) @ qqtTask.s_inv @ qqtTask.B.T
                     - qqtTask.C @ (fractional_matrix_power(e_st_inv, 2) - np.eye(
                 qqtTask.out_dim)) @ qqtTask.s_inv @ qqtTask.C.T)
 
@@ -258,8 +283,8 @@ def check_analytical_solution(solution):
             next_val = left @ centre @ right
             QQts.append(next_val)
             w2w1s.append(qqtTask.getw2w1(next_val))
-            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
-    # TODO: A(0), RT i just made these the identity, not sure if they should be something else
+
+            # TODO: A(0), RT i just made these the identity, not sure if they should be something else
 
     elif solution == '33':
         for i in range(1, qqtTask.training_steps):
@@ -314,75 +339,108 @@ def check_analytical_solution(solution):
             next_val = left @ centre @ right
             QQts.append(next_val)
             w2w1s.append(qqtTask.getw2w1(next_val))
-            # w2w1s.append(np.array([next_val[-required_shape[0]:, :required_shape[1]]]))
 
+    # TODO: i should also return the losses
+    # return QQts
+    return np.asarray(losses), np.asarray(w2w1s)
+
+
+def computationalSolution(qqtTask):
     # Now, generate the computational solution
-    losses, ws = train_network(train= qqtTask.train,
-                               learning_rate= qqtTask.learning_rate,
+    losses, ws = train_network(train=qqtTask.train,
+                               learning_rate=qqtTask.learning_rate,
                                in_dim=qqtTask.in_dim,
                                hidden_dim=qqtTask.hidden_dim,
-                               out_dim = qqtTask.out_dim,
-                               init_w1= qqtTask.init_w1,
-                               init_w2= qqtTask.init_w2,
-                               training_steps= qqtTask.training_steps)
+                               out_dim=qqtTask.out_dim,
+                               init_w1=qqtTask.init_w1,
+                               init_w2=qqtTask.init_w2,
+                               training_steps=qqtTask.training_steps)
 
-    print('analytic weights: ', w2w1s[:3])
-    print('simulation weights: ', ws)
+    return losses, ws
 
-    # i don't understand this, why dont i just do it for each one
-    # analytical_output = (np.asarray(w2w1s)[:, 0, :, :] @ qqtTask.X[:qqtTask.plot_items_n].T)
-    # simulation_output = (np.asarray(ws)[:, 0, :, :] @ qqtTask.X[:qqtTask.plot_items_n].T)
 
-    analytical_output = np.asarray([np.asarray(w2w1) @ qqtTask.X.T for w2w1 in w2w1s])
-    simulation_output = np.asarray([np.asarray(w) @ qqtTask.X.T for w in ws])
+def compareSolutions(solution):
+    qqtTask = QQTTask(in_dim=4,
+                      hidden_dim=8,
+                      out_dim=4,
+                      initial_scale=0.1,
+                      batch_size=10,
+                      learning_rate=0.01,
+                      training_steps=400)
 
-    print('analytical shape: ', analytical_output.shape)
-    print('simulation shape: ', simulation_output.shape)
+    analytical_ls, analytical_ws, = check_analytical_solution(solution, qqtTask)
+    simulation_ls, simulation_ws = computationalSolution(qqtTask)
 
-    # print('simulation: ', simulation_output[:3])
+    # print('analytical shape: ', analytical_ws.shape)
+    # print('simulation shape: ', simulation_ws.shape)
+    print('simulation: ', simulation_ws[-3:])
+    print('analytic: ', analytical_ws[-3:])
+
+    """
+    Plot Fobrenius norm in the difference between the two matrices
+    """
+
+    differences = [np.linalg.norm(simulation_w - analytical_w) for (simulation_w, analytical_w)
+                   in zip(simulation_ws, analytical_ws)]
+
+    # print(differences)
     #
-    # print('analytic: ', analytical_output[:3])
+    # plt.plot(differences)
+    # plt.title('Norm of the differences between computational and analytical')
+    # plt.show()
     """
     Plot trajectories of the representations of both
     """
-    rng = np.linspace(0.57, 1., 10)
-    # TODO: plot analytical output
 
-    plt.figure()
-    # fig.set_xscale('log')
+    print('start simulation: ', simulation_ws[0])
+    print('end simulation: ', simulation_ws[-1])
+    print(simulation_ls)
+    # plt.plot(simulation_ws.reshape(analytical_ws.shape[0], -1),
+    #          color=qqtTask.blind_colours[0])
 
-    plt.xlabel('Training Steps')
-    plt.title('Simulation Results')
-    # for color, output in zip(blind_colours, simulation_output[1].T):
-    #     for val in output:
-    #         plt.plot(rng, [val]*10, c=color, lw=2.5, clip_on=False, zorder=1)
-    #         plt.plot(rng, [val]*10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
-    plot_matrix_evolution(simulation_output, 4)
+    # plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1),
+    #           c='k', alpha=0.7, linestyle=(0, (1,2)))
 
-    # TODO: plot simulation output
-    for n, (color) in enumerate(qqtTask.blind_colours[:qqtTask.plot_items_n]):
-        plt.plot(-5, -5, c=color, lw=2.5, label=f"Item {n + 1}")
-    plt.plot(-5, -5, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label="Analytical")
-
-    """
-    Plot difference between analytical and simulation
-    """
-    diff = np.array([m1 - m2 for m1, m2 in zip(analytical_output, simulation_output)])
-
-    plt.figure()
-    plt.title('difference between simulation and analytical')
-    for color, output in zip(qqtTask.blind_colours, diff[1].T):
-        for val in output:
-            plt.plot(rng, [val] * 10, c=color, lw=2.5, clip_on=False, zorder=1)
-            plt.plot(rng, [val] * 10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
-
+    plt.title('Analytical vs Simulation')
     plt.show()
-
-    # print('analytical: ', analytical_output)
-    # print('simulation: ', simulation_output)
-    # print('diff: ', diff)
+    # rng = np.linspace(0.57, 1., 10)
+    # # TODO: plot analytical output
+    #
+    # plt.figure()
+    # # fig.set_xscale('log')
+    #
+    # plt.xlabel('Training Steps')
+    # plt.title('Simulation Results')
+    # # for color, output in zip(blind_colours, simulation_output[1].T):
+    # #     for val in output:
+    # #         plt.plot(rng, [val]*10, c=color, lw=2.5, clip_on=False, zorder=1)
+    # #         plt.plot(rng, [val]*10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
+    # plot_matrix_evolution(simulation_output, 3)
+    #
+    # # TODO: plot simulation output
+    # for n, (color) in enumerate(qqtTask.blind_colours[:qqtTask.plot_items_n]):
+    #     plt.plot(-5, -5, c=color, lw=2.5, label=f"Item {n + 1}")
+    # plt.plot(-5, -5, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label="Analytical")
+    #
+    # """
+    # Plot difference between analytical and simulation
+    # """
+    # diff = np.array([m1 - m2 for m1, m2 in zip(analytical_output, simulation_output)])
+    #
+    # plt.figure()
+    # plt.title('difference between simulation and analytical')
+    # for color, output in zip(qqtTask.blind_colours, diff[1].T):
+    #     for val in output:
+    #         plt.plot(rng, [val] * 10, c=color, lw=2.5, clip_on=False, zorder=1)
+    #         plt.plot(rng, [val] * 10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
+    #
+    # plt.show()
+    #
+    # # print('analytical: ', analytical_output)
+    # # print('simulation: ', simulation_output)
+    # # print('diff: ', diff)
     return
 
 
 equation_number = input('what equation should we check? Input a number: ')
-check_analytical_solution(equation_number)
+compareSolutions(equation_number)

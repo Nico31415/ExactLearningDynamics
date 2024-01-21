@@ -30,9 +30,10 @@ class QQTTask:
 
         self.tau = 1 / learning_rate
 
-        self.init_w1, self.init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, initial_scale)
+        self.init_w1, self.init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, initial_scale * 2)
         self.train, _, _ = gs.datasets.StudentTeacher(batch_size, [self.init_w1, self.init_w2], [gs.datasets.Whiten()])
 
+        self.blind_colours = BlindColours().get_colours()
         # TODO: don't really understand this part
         (self.X, self.Y) = self.train(None)
         # self.train = (self.X, self.Y)
