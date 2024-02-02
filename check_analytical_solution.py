@@ -43,11 +43,15 @@ def plot_matrix_evolution(matrix_list, n_components):
 
 
 def train_network(train, learning_rate, in_dim, hidden_dim, out_dim, init_w1, init_w2, training_steps):
+
+
     task = gs.tasks.FullBatchLearning(train)
+
+
     optimiser = gs.GradientDescent(learning_rate)
     loss = gs.MeanSquaredError()
 
-    init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.5)
+    # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.5)
 
     mlp = gs.Network([
         gs.Linear(hidden_dim, bias=False, weight_init=gs.init.FromFixedValue(init_w1)),
@@ -147,7 +151,7 @@ def check_analytical_solution(solution, qqtTask):
 
             out = e_ft @ qqtTask.q0
             centre_centre_centre = (e_ft @ np.linalg.inv(qqtTask.F) @ e_ft - np.linalg.inv(qqtTask.F))
-            centre_centre = (1 / 2 * qqtTask.q0 @ centre_centre_centre @ qqtTask.q0)
+            centre_centre = (1 / 2 * qqtTask.q0.T @ centre_centre_centre @ qqtTask.q0)
             print('centre centre shape: ', centre_centre.shape)
             centre = np.linalg.inv(np.eye(centre_centre.shape[0]) + centre_centre)
             # try:
@@ -159,6 +163,9 @@ def check_analytical_solution(solution, qqtTask):
 
             QQts.append(next_val)
             w2w1s.append(qqtTask.getw2w1(next_val))
+            curr_weight = w2w1s[-1]
+            loss = (1 / 2) * np.linalg.norm(qqtTask.Y - np.matmul(qqtTask.X, curr_weight)) ** 2
+            losses.append(loss)
 
     elif solution == '10':
         for i in range(1, qqtTask.training_steps):
@@ -173,10 +180,11 @@ def check_analytical_solution(solution, qqtTask):
             centre = np.linalg.inv(np.eye(qqtTask.lmda_inv.shape[0]) + 1 / 2 * qqtTask.q0.T @ (
                     qqtTask.O @ e_lmdat @ qqtTask.O.T @ qqtTask.O @ qqtTask.lmda_inv @ qqtTask.O.T @ e_lmdat
                     @ qqtTask.O.T - qqtTask.O @ qqtTask.lmda_inv @ qqtTask.O.T))
-
             next_val = left @ centre @ right
             QQts.append(next_val)
             w2w1s.append(qqtTask.getw2w1(next_val))
+            loss = (1 / 2) * np.linalg.norm(qqtTask.Y - np.matmul(qqtTask.X, curr_weight)) ** 2
+            losses.append(loss)
 
     elif solution == '12':
         for i in range(1, qqtTask.training_steps):
@@ -402,14 +410,21 @@ def compareSolutions(solution):
     print('start simulation: ', simulation_ws[0])
     print('end simulation: ', simulation_ws[-1])
     print(simulation_ls)
-    plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1), color=qqtTask.blind_colours[1])
-    plt.plot(np.array(simulation_ws).reshape(np.array(simulation_ws).shape[0], -1),
-              color=qqtTask.blind_colours[0])
+    # plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1), color=qqtTask.blind_colours[1])
+    # plt.plot(np.array(simulation_ws).reshape(np.array(simulation_ws).shape[0], -1),
+    #           color=qqtTask.blind_colours[0])
+
+    print('analytical loss: ', analytical_ls)
+    plt.plot(analytical_ls)
+
+
+
 
     #plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1),
     #           c='k', alpha=0.7, linestyle=(0, (1,2)))
 
-    plt.title('Analytical Solution (3)')
+    # plt.title('Analytical vs Simulation (4)')
+    plt.title('Losses Analytical')
     plt.ylabel('Network Output')
     plt.xlabel('Training Steps')
     plt.show()
