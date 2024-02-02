@@ -72,9 +72,36 @@ def zero_balanced_weights(in_dim, hidden_dim, out_dim, sigma):
     return w1, w2
 
 
+def balanced_weights(hidden_dim, sigma=1, lmda=1):
+    # generate random orthogonal matrix r of size (hidden_dim, hidden_dim)
+    U, S, V = np.linalg.svd(np.random.randn(hidden_dim, hidden_dim))
+    r = U @ V.T
 
-def balanced_weights(in_dim, hidden_dim, out_dim, sigma, lmda):
+    w1 = sigma * np.random.randn(hidden_dim, hidden_dim)
+    w2 = sigma * np.random.randn(hidden_dim, hidden_dim)
 
-    w1 = np.eye((hidden_dim, in_dim)) * np.sqrt(lmda + 1)
-    w2 = np.eye((out_dim, hidden_dim))
+    U_, S_, V_ = np.linalg.svd(w2 @ w1)
+    s = np.sqrt(np.diag(S_))
 
+    lmda = np.trace(w2 @ w1) / hidden_dim
+
+    factor = (- lmda + np.sqrt(lmda ** 2 + 4 * s ** 2)) / 2
+
+    s_2 = np.sqrt(np.diag(np.diag(factor)))
+    s_1 = np.diag(np.diag(s) / np.diag(s_2))
+
+    w1_out = r @ s_1 @ V.T
+    w2_out = U @ s_2 @ r.T
+    S_test = s_2 @ s_1
+
+    q = w1_out @ w1_out.T - w2_out.T @ w2_out
+
+    scale_by = lmda / q[0][0]
+    w1_out = scale_by * w1_out
+    w2_out = scale_by * w2_out
+    q = w1_out @ w1_out.T - w2_out.T @ w2_out
+
+    return w1_out, w2_out, S_test, q
+
+
+print(balanced_weights(3))

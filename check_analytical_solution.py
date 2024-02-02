@@ -215,6 +215,10 @@ def check_analytical_solution(solution, qqtTask):
             w2w1s.append(qqtTask.getw2w1(next_val))
         return
 
+
+    #student teacher guarantees solution
+    #if you are full rank you are always guaranteed
+
     elif solution == '14':
         for i in range(1, qqtTask.training_steps):
             t = i * qqtTask.learning_rate
@@ -359,6 +363,9 @@ def computationalSolution(qqtTask):
     return losses, ws
 
 
+#randominputoutput mapping
+
+
 def compareSolutions(solution):
     qqtTask = QQTTask(in_dim=4,
                       hidden_dim=8,
@@ -395,13 +402,16 @@ def compareSolutions(solution):
     print('start simulation: ', simulation_ws[0])
     print('end simulation: ', simulation_ws[-1])
     print(simulation_ls)
-    # plt.plot(simulation_ws.reshape(analytical_ws.shape[0], -1),
-    #          color=qqtTask.blind_colours[0])
+    plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1), color=qqtTask.blind_colours[1])
+    plt.plot(np.array(simulation_ws).reshape(np.array(simulation_ws).shape[0], -1),
+              color=qqtTask.blind_colours[0])
 
-    # plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1),
+    #plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1),
     #           c='k', alpha=0.7, linestyle=(0, (1,2)))
 
-    plt.title('Analytical vs Simulation')
+    plt.title('Analytical Solution (3)')
+    plt.ylabel('Network Output')
+    plt.xlabel('Training Steps')
     plt.show()
     # rng = np.linspace(0.57, 1., 10)
     # # TODO: plot analytical output

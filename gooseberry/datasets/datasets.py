@@ -46,6 +46,8 @@ class Dataset:
         pass
 
 
+
+## TODO use this
 class RandomRegression(Dataset):
     def __new__(cls, items_n, input_dim, output_dim, preprocessing=[]):
         cls = super().__new__(cls)
