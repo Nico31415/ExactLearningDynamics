@@ -375,13 +375,13 @@ def computationalSolution(qqtTask):
 
 
 def compareSolutions(solution):
-    qqtTask = QQTTask(in_dim=4,
+    qqtTask = QQTTask(in_dim=8,
                       hidden_dim=8,
-                      out_dim=4,
-                      initial_scale=0.1,
-                      batch_size=10,
-                      learning_rate=0.01,
-                      training_steps=400)
+                      out_dim=8,
+                      initial_scale=0.001,
+                      batch_size=8,
+                      learning_rate=0.001,
+                      training_steps=200)
 
     analytical_ls, analytical_ws, = check_analytical_solution(solution, qqtTask)
     simulation_ls, simulation_ws = computationalSolution(qqtTask)
@@ -408,14 +408,15 @@ def compareSolutions(solution):
     """
 
     print('start simulation: ', simulation_ws[0])
-    print('end simulation: ', simulation_ws[-1])
-    print(simulation_ls)
-    # plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1), color=qqtTask.blind_colours[1])
-    # plt.plot(np.array(simulation_ws).reshape(np.array(simulation_ws).shape[0], -1),
-    #           color=qqtTask.blind_colours[0])
+    print('start analytic: ', analytical_ws[0])
+    # print('end simulation: ', simulation_ws[-1])
+    # print(simulation_ls)
+    plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1), color=qqtTask.blind_colours[1], label = 'analytical')
+    plt.plot(np.array(simulation_ws).reshape(np.array(simulation_ws).shape[0], -1),
+              color=qqtTask.blind_colours[0], label='')
 
     print('analytical loss: ', analytical_ls)
-    plt.plot(analytical_ls)
+    # plt.plot(analytical_ls)
 
 
 
@@ -423,8 +424,8 @@ def compareSolutions(solution):
     #plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1),
     #           c='k', alpha=0.7, linestyle=(0, (1,2)))
 
-    # plt.title('Analytical vs Simulation (4)')
-    plt.title('Losses Analytical')
+    plt.title('Analytical vs Simulation (4)')
+    # plt.title('Losses Analytical')
     plt.ylabel('Network Output')
     plt.xlabel('Training Steps')
     plt.show()
