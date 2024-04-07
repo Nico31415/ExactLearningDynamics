@@ -15,9 +15,9 @@ class QQT:
 
         whitened = np.all(np.round(1. / self.batch_size * x_target @ x_target.T, 3) == np.identity(n_i))
         identity = False
-        if x_target.shape[0] == x_target.shape[1]:
-            identity = np.all(x_target == np.identity(n_i))
-        assert whitened or identity, f"X not whitened"
+        # if x_target.shape[0] == x_target.shape[1]:
+        #     identity = np.all(x_target == np.identity(n_i))
+        # assert whitened or identity, f"X not whitened"
 
         sigma_xy_target = (1. / self.batch_size) * y_target @ x_target.T
 

@@ -2,6 +2,7 @@ import gooseberry as gs
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.linalg import fractional_matrix_power
 
 from tools import BlindColours, zero_balanced_weights
 from scipy.linalg import fractional_matrix_power
@@ -38,6 +39,15 @@ class QQTTask:
         self.blind_colours = BlindColours().get_colours()
         # TODO: don't really understand this part
         (self.X, self.Y) = self.train(None)
+
+        self.X = self.X.T
+        self.Y = self.Y.T
+
+        whitened = np.all(np.round(1. / self.batch_size * self.X @ self.X.T, 2) == np.identity(in_dim))
+
+        print('difference: ', np.round(1. / self.batch_size * self.X @ self.X.T, 4)  - np.identity(in_dim))
+        print(self.X @ self.X.T)
+        # assert whitened, f'X not whitened'
         # self.train = (self.X, self.Y)
         self.c = 0
 
@@ -46,7 +56,7 @@ class QQTTask:
 
         self.qqt0 = self.q0 @ self.q0.T
 
-        self.sigma_xy = self.Y.T @ self.X
+        self.sigma_xy =  (1 / self.batch_size) * self.Y @ self.X.T
 
         self.F = np.vstack([
             np.hstack([self.c / 2 * np.eye(self.sigma_xy.shape[1]), self.sigma_xy.T]),
@@ -67,11 +77,20 @@ class QQTTask:
 
         self.lmda_inv = np.linalg.inv(self.lmda)
 
+        self.task = gs.tasks.FullBatchLearning(self.train)
+        self.optimiser = gs.GradientDescent(self.learning_rate)
+        self.loss = gs.MeanSquaredError()
+
         self.e_f = np.exp(1 / self.tau * self.F)
 
         self.evals, self.evecs = np.linalg.eig(self.e_f)
-        self.O = self.evecs
-        self.e_lmda = np.diag(self.evals)
+
+
+        self.O = 1/np.sqrt(2) * np.vstack([np.hstack([self.Vt_.T, self.Vt_.T]), np.hstack([self.U_, -self.U_])])
+        # self.O = self.evecs
+
+        self.e_lmda = fractional_matrix_power(self.lmda, np.e)
+        # self.e_lmda = np.diag(self.evals)
 
         self.U, self.A0, self.Vt = np.linalg.svd(self.init_w2 @ self.init_w1)
         # temp = np.zeros(self.A0.shape)

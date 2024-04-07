@@ -56,6 +56,8 @@ class RandomRegression(Dataset):
         cls.training_data = jax.random.normal(keys[0], (items_n, input_dim)) * 1. / np.sqrt(input_dim)
         cls.training_labels = jax.random.normal(keys[1], (items_n, output_dim)) * 1. / np.sqrt(output_dim)
 
+        preprocessing.insert(0, Whiten())
+
         return cls.create_advances(cls, preprocessing)
 
 
@@ -182,6 +184,6 @@ class Whiten:
         if len(x_test) > 0:
             x_test = x_test.T - np.mean(x_test.T, axis=1, keepdims=True)
             x_test = (np.diag(1. / np.sqrt(eig_vals)) @ eig_vecs.T @ x_test).T
-
+            
         return x_train, x_validate, x_test, y_train, y_validate, y_test
 

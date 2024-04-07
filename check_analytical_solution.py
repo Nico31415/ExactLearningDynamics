@@ -145,9 +145,8 @@ def check_analytical_solution(solution, qqtTask):
 
     elif solution == '4':
         for i in range(1, qqtTask.training_steps):
-            tau = 1
-            t = i * qqtTask.learning_rate
-            e_ft = np.exp(t / tau * qqtTask.F)
+            t = i
+            e_ft = np.exp((t / qqtTask.tau) * qqtTask.F)
 
             out = e_ft @ qqtTask.q0
             centre_centre_centre = (e_ft @ np.linalg.inv(qqtTask.F) @ e_ft - np.linalg.inv(qqtTask.F))
@@ -412,10 +411,15 @@ def compareSolutions(solution):
     # print('end simulation: ', simulation_ws[-1])
     # print(simulation_ls)
     plt.plot(analytical_ws.reshape(analytical_ws.shape[0], -1), color=qqtTask.blind_colours[1], label = 'analytical')
+    plt.legend()
+    plt.figure()
     plt.plot(np.array(simulation_ws).reshape(np.array(simulation_ws).shape[0], -1),
-              color=qqtTask.blind_colours[0], label='')
+              color=qqtTask.blind_colours[0], label='simulation')
+
+    plt.legend()
 
     print('analytical loss: ', analytical_ls)
+    print('simulation loss: ', simulation_ls)
     # plt.plot(analytical_ls)
 
 
