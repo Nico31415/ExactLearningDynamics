@@ -1,4 +1,7 @@
 import numpy as np
+from sklearn.preprocessing import StandardScaler 
+from sklearn.decomposition import PCA
+import torch 
 
 
 
@@ -161,3 +164,61 @@ class QQTDiagonal:
 
         self.t += 1.
         return u_ @ np.diag(numerator / denominator) @ v_.T
+
+
+def zero_balanced_weights(in_dim, hidden_dim, out_dim, sigma):
+    r, _, _ = np.linalg.svd(np.random.normal(0., 1., (hidden_dim, hidden_dim)))
+
+    w1 = np.random.normal(0., sigma, (hidden_dim, in_dim))
+    w2 = np.random.normal(0., sigma, (out_dim, hidden_dim))
+    u, s, vt = np.linalg.svd(w2 @ w1, False)
+
+    s = np.diag(np.sqrt(s) * 1.15)
+
+    smaller_dim = in_dim if in_dim < out_dim else out_dim
+
+    s0 = np.vstack([s, np.zeros((hidden_dim - smaller_dim, smaller_dim))])
+    w1 = r @ s0 @ vt
+
+    s0 = np.hstack([s, np.zeros((smaller_dim, hidden_dim - smaller_dim))])
+    w2 = u @ s0 @ r.T
+
+    return w1, w2
+
+def whiten(X):
+
+    scaler = StandardScaler()
+    X_standardised = scaler.fit_transform(X)
+    
+    pca = PCA()
+    X_pca = pca.fit_transform(X_standardised)
+
+    X_whitened = torch.tensor(X_pca / np.sqrt(pca.explained_variance_), dtype=torch.float32)
+
+    return X_whitened
+
+def get_random_regression_task(batch_size, in_dim, out_dim):
+    X = torch.randn(batch_size, in_dim)
+    Y = torch.randn(batch_size, out_dim)
+    X_whitened = whiten(X)
+    if batch_size > 1:
+        X_whitened = 1/np.sqrt(batch_size - 1) * X_whitened
+
+    return X_whitened, Y
+
+in_dim = 5
+hidden_dim = 10
+out_dim = 2
+
+tau = 0.001
+batch_size = 10
+epochs = 1
+
+init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, .35)
+init_w1 = torch.tensor(init_w1)
+init_w2 = torch.tensor(init_w2)
+
+X_train, Y_train = get_random_regression_task(batch_size, in_dim, out_dim)
+
+analytical = QQT(init_w1, init_w2, X_train.T, Y_train.T, True)
+analytical = np.asarray([analytical.forward(tau) for _ in range(epochs)])
