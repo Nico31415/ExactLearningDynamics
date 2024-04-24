@@ -35,7 +35,7 @@ hidden_dim = 10
 out_dim = 2
 
 batch_size = 10
-learning_rate = 0.1
+learning_rate = 0.001
 training_steps = 400
 
 
@@ -142,6 +142,33 @@ plt.legend()
 plt.show()
 
 ###DO IT IN A MORE COMPLICATED WAY###
+F = np.vstack([np.hstack([np.zeros((sigma_yx_i.shape[1], sigma_yx_i.shape[1])), sigma_yx_i.T]),
+               np.hstack([sigma_yx_i, np.zeros((sigma_yx_i.shape[0], sigma_yx_i.shape[0]))])])
+
+qqts_list = []
+qqts = None 
+for i, (X, Y) in enumerate(tasks):
+    if qqts is None:
+        qqts = QQT_new(init_w1, init_w2, X.T, Y.T ,False)
+    else:
+        qqts = QQT_new(w1s_list[training_steps*i], w2s_list[training_steps*i], X.T, Y.T, False)
+    qqts = np.asarray([qqts.forward(learning_rate) for _ in range(training_steps)])
+    qqts_list.extend(qqts)
+
+qqt_primes = [learning_rate * (F @ qqt + qqt @ F - qqt @ qqt.T) for qqt in qqts_list] 
+
+w2w1s_primes = [qqt_prime[in_dim:, :in_dim] for qqt_prime in qqt_primes]
+
+loss_rate_anaytical2 = [np.trace(sigma_j @ sigma_j_prime.T) - 1/batch_size * np.trace(sigma_j_prime @ sigma_yx_i.T) 
+                       for (sigma_j, sigma_j_prime) in zip(analyticals_list, w2w1s_primes)]
+plt.figure()
+plt.plot(loss_rate_anaytical2, label='analytical loss rate 2')
+plt.plot(loss_rate, label='empirical')
+plt.title('Empirical vs Analytical Loss Rate in terms of correlations 2')
+plt.legend()
+plt.show()
+
+
 
 
 ###RATE OF FORGETTING###
@@ -155,6 +182,32 @@ plt.figure()
 plt.plot(loss_rate_anaytical, label='analytical forgetting rate')
 plt.plot(loss_rate, label='empirical')
 plt.title('Empirical vs Analytical Forgetting Rate in terms of correlations')
+plt.legend()
+plt.show()
+
+F = np.vstack([np.hstack([np.zeros((sigma_yx_i.shape[1], sigma_yx_i.shape[1])), sigma_yx_i.T]),
+               np.hstack([sigma_yx_i, np.zeros((sigma_yx_i.shape[0], sigma_yx_i.shape[0]))])])
+
+qqts_list = []
+qqts = None 
+for i, (X, Y) in enumerate(tasks):
+    if qqts is None:
+        qqts = QQT_new(init_w1, init_w2, X.T, Y.T ,False)
+    else:
+        qqts = QQT_new(w1s_list[training_steps*i], w2s_list[training_steps*i], X.T, Y.T, False)
+    qqts = np.asarray([qqts.forward(learning_rate) for _ in range(training_steps)])
+    qqts_list.extend(qqts)
+
+qqt_primes = [1/learning_rate* (F @ qqt + qqt @ F - qqt @ qqt.T) for qqt in qqts_list] 
+
+w2w1s_primes = [qqt_prime[in_dim:, :in_dim] for qqt_prime in qqt_primes]
+
+loss_rate_anaytical2 = [np.trace(sigma_j @ sigma_j_prime.T) - 1/batch_size * np.trace(sigma_j_prime @ sigma_yx_i.T) 
+                       for (sigma_j, sigma_j_prime) in zip(analyticals_list, w2w1s_primes)]
+plt.figure()
+plt.plot(loss_rate_anaytical2, label='analytical forgetting rate 2')
+plt.plot(forgetting_rate, label='empirical')
+plt.title('Empirical vs Analytical Forgetting Rate in terms of correlations 2')
 plt.legend()
 plt.show()
 
