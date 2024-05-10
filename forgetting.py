@@ -38,6 +38,7 @@ batch_size = 10
 learning_rate = 0.001
 training_steps = 400
 
+#TODO: initialise both systems in the same place
 
 
 init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
@@ -59,10 +60,13 @@ for (X, Y) in tasks:
 analyticals_list = []
 
 analytical = None 
+
+
 for i, (X, Y) in enumerate(tasks):
     if analytical is None:
         analytical = QQT_new(init_w1, init_w2, X.T, Y.T ,True)
     else:
+        #TODO: maybe indexing is wrong since initial points dont coincide
         analytical = QQT_new(w1s_list[training_steps*i], w2s_list[training_steps*i], X.T, Y.T, True)
     analytical = np.asarray([analytical.forward(learning_rate) for _ in range(training_steps)])
     analyticals_list.extend(analytical)
@@ -95,6 +99,8 @@ sigma_yy_i = 1/batch_size * Y_i @ Y_i.T
 
 # losses_v0 = [0.5 * 1 / batch_size * np.trace((X_i @sigma_j.T - Y_i) @ (X_i @ sigma_j.T - Y_i).T) for sigma_j in analyticals_list]
 
+
+#w2w1(t)
 analytical_loss = [0.5 * (np.linalg.norm(sigma_j - sigma_yx_i, ord='fro')**2
                                      -  np.trace(sigma_yx_i @ sigma_yx_i.T)
                                      + np.trace(sigma_yy_i)) for sigma_j in analyticals_list]
@@ -151,6 +157,8 @@ sigma_yx_i = 1/batch_size * Y_i @ X_i.T
 sigma_yx_j = 1/batch_size * Y_j @ X_j.T
 sigma_yx_k = 1/batch_size * Y_k @ X_k.T
 
+#w2w1(t)
+#d/dt (w2w1(t))
 F1 = np.vstack([np.hstack([np.zeros((sigma_yx_i.shape[1], sigma_yx_i.shape[1])), sigma_yx_i.T]),
                np.hstack([sigma_yx_i, np.zeros((sigma_yx_i.shape[0], sigma_yx_i.shape[0]))])])
 
@@ -252,4 +260,5 @@ plt.title('Empirical vs Analytical Forgetting Rate in terms of correlations 2')
 plt.legend()
 plt.show()
 
-###LINEAR REGRESSION 1D CASE##3
+
+##TODO: do it with for delt balanced forgetting

@@ -1,11 +1,3 @@
-import gooseberry as gs
-from dynamics import QQT
-from tools import BlindColours, zero_balanced_weights
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-
 import torch
 import torch.nn as nn 
 import torch.optim as optim
@@ -19,7 +11,57 @@ import seaborn as sns
 from tools import BlindColours, zero_balanced_weights
 
 
-class QQT_new:
+
+
+class LinearNetwork:
+    def __init__(self, in_dim, hidden_dim, out_dim, init_w1 = None, init_w2 = None):
+
+        if init_w1 is not None and init_w2 is not None:
+
+            self.W1  = init_w1
+            self.W2 = init_w2
+        else:
+            self.W1 = np.random.randn(hidden_dim, in_dim)
+            self.W2 = np.random.randn(out_dim, hidden_dim)
+
+    def forward(self, x):
+        
+        self.z = self.W2 @ self.W1 @ x
+        return self.z
+
+    def backward(self, x, y, learning_rate):
+
+        self.forward(x)
+
+        dW1 =  1/x.shape[1] *self.W2.T @ (self.z-y) @ x.T 
+        dW2 = 1/x.shape[1] * (self.z - y) @ x.T @ self.W1.T
+
+        self.W2 -= learning_rate * dW2 
+        self.W1 -= learning_rate * dW1 
+
+
+    def train(self, X_train, Y_train, epochs, learning_rate):
+        w1s = []
+        w2s = []
+        print('X_train shape: ', X_train.shape)
+        print('Y_train shape: ', Y_train.shape)
+        losses = []
+        loss = np.mean((self.forward(X_train) - Y_train) ** 2)
+        losses.append(loss)
+        w1s.append(self.W1)
+        w2s.append(self.W2)
+        for _ in range(epochs):
+            
+            self.backward(X_train, Y_train, learning_rate)
+            loss = np.mean((self.forward(X_train) - Y_train) ** 2)
+            losses.append(loss)
+            w1s.append(self.W1)
+            w2s.append(self.W2)
+            # print(f"Epoch {epoch+1}/{epochs}, Loss: {loss}")
+
+        return w1s, w2s, losses
+    
+class QQT:
     def __init__(self, init_w1, init_w2, X, Y, weights_only=False):
         
         self.weights_only = weights_only
@@ -28,7 +70,7 @@ class QQT_new:
         self.input_dim = X.shape[1]
         self.output_dim = Y.shape[1]
         
-        sigma_yx_tilde = 1 / self.batch_size * Y.T @ X 
+        sigma_yx_tilde = 1 / self.batch_size * Y.T@ X 
 
         U_, S_, Vt_= np.linalg.svd(sigma_yx_tilde)
         V_ = Vt_.T 
@@ -127,170 +169,98 @@ class QQT_new:
         return qqt 
     
 
-#THE NETWORK'S WEIGHTS ARE OPTIMISED WITH FULL BATCH GRADIENT DESCEINT WITH LEARNING RATE TAU
-
-class LinearNetwork(nn.Module):
-    def __init__(self, in_dim, hidden_dim, out_dim, init_w1=None, init_w2=None):
-        super(LinearNetwork, self).__init__()
-        self.first_layer = nn.Linear(in_dim, hidden_dim)
-        self.second_layer = nn.Linear(hidden_dim , out_dim)
-
-        if init_w1 is not None:
-            self.first_layer.weight.data = init_w1.float()
-        if init_w2 is not None:
-            self.second_layer.weight.data = init_w2.float()
-
-    def forward(self, x):
-        x = self.first_layer(x)
-        x = self.second_layer(x)
-        return x 
-    
-
-def train(model, X_train, y_train, criterion, optimizer, epochs):
-    
-    w_ones = [model.first_layer.weight.data.clone()]
-    w_twos = [model.second_layer.weight.data.clone()]
-    losses = []
-
-    for epoch in range(epochs):
-        outputs = model(X_train)
-        loss = criterion(outputs, y_train)
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        w_ones.append(model.first_layer.weight.data.clone().numpy())
-        w_twos.append(model.second_layer.weight.data.clone().numpy())
-        losses.append(loss.item())
-
-        if (epoch + 1) % 10 == 0:
-            print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
-
-    
-    w_ones = np.array(w_ones)
-    w_twos = np.array(w_twos)
-    losses = np.array(losses)
-
-    return w_ones, w_twos, losses
-
-
 def whiten(X):
 
     scaler = StandardScaler()
+
     X_standardised = scaler.fit_transform(X)
     
     pca = PCA()
     X_pca = pca.fit_transform(X_standardised)
 
-    X_whitened = torch.tensor(X_pca / np.sqrt(pca.explained_variance_), dtype=torch.float32)
+    print('explained variance: ', pca.explained_variance_)
+    X_whitened = X_pca / np.sqrt(pca.explained_variance_)
+
+    X_whitened = np.sqrt(X.shape[0] / (X.shape[0] - 1)) * X_whitened
 
     return X_whitened
 
 def get_random_regression_task(batch_size, in_dim, out_dim):
-    X = torch.randn(batch_size, in_dim)
-    Y = torch.randn(batch_size, out_dim)
+    X = np.random.randn(batch_size, in_dim)
+    Y = np.random.randn(batch_size, out_dim)
     X_whitened = whiten(X)
 
     return X_whitened, Y
 
 
-np.random.seed(1)
-
 in_dim = 5
 hidden_dim = 10
 out_dim = 2
 
+tau = 0.1
 batch_size = 10
-learning_rate = 0.1
-training_steps = 400
-
-plot_items_n = 4
-blind_colours = BlindColours().get_colours()
+epochs = 150
 
 init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, .35)
-train_data, _, _ = gs.datasets.StudentTeacher(batch_size, [init_w1, init_w2], [gs.datasets.Whiten()])
+# init_w1 = torch.tensor(init_w1)
+# init_w2 = torch.tensor(init_w2)
 
-fig, axs = plt.subplots(1, 3, figsize=(12, 3.))
-
-for i, initial_scale in enumerate([0.01, .25, .25]):
-    task = gs.tasks.FullBatchLearning(train_data)
-    optimiser = gs.GradientDescent(learning_rate)
-    loss = gs.MeanSquaredError()
-
-    init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, initial_scale)
-    
-    mlp = gs.Network([
-        gs.Linear(hidden_dim, bias=False, weight_init=gs.init.FromFixedValue(init_w1)),
-        gs.Linear(out_dim, bias=False, weight_init=gs.init.FromFixedValue(init_w2))
-    ])
-
-    trainer = gs.Trainer(task, mlp, loss, optimiser)
-    state, params = gs.assemble(1)
-
-    losses = []
-    ws = [params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"]]
-    
-    for training_step in range(training_steps):
-        state, params, loss = trainer(state, params)
-        losses.append(loss)
-        ws.append(params["network"]["layer-1"]["w"] @ params["network"]["layer-0"]["w"])
-
-    
-    X, Y = train_data(None)
-
-    init_w1, init_w2 = torch.tensor(init_w1), torch.tensor(init_w2)
-    model = LinearNetwork(in_dim=in_dim, hidden_dim=hidden_dim, out_dim=out_dim, init_w1=init_w1, init_w2=init_w2)
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
-    w1s, w2s, losses = train(model, torch.tensor(np.array(X)), torch.tensor(np.array(Y)), criterion, optimizer, training_steps)
-
-    analytical = np.asarray([w2 @ w1 for (w2, w1) in zip(w2s, w1s)])
+model = LinearNetwork(in_dim=in_dim, hidden_dim=hidden_dim, out_dim=out_dim, init_w1=init_w1, init_w2=init_w2)
+# criterion = nn.MSELoss()
+# optimizer = torch.optim.SGD(model.parameters(), lr=tau)
 
 
-    # analytical = QQT_new(init_w1, init_w2, X, Y, True)
-    # analytical = np.asarray([analytical.forward(learning_rate) for _ in range(training_steps)])
-    
 
-    outputs = (np.asarray(ws)[:, 0, :, :] @ X[:plot_items_n].T)
-    for color, output in zip(blind_colours, outputs.T):
-        for val in output:
-            axs[i].plot(val, c=color, lw=2.5)
-    axs[i].plot((analytical[:-1] @ X[:plot_items_n].T).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2))) # (0, (3, 4, 3, 1))
-    
-    for color, target in zip(blind_colours, Y[:plot_items_n]):
-        for value in target:
-            axs[i].scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
-    
-    axs[i].set_xlim(1, training_steps * 1.6)
-    axs[i].set_ylim([-2.2, 2.2])
-    
-    axs[i].set_xscale("log")
-    
-    axs[i].set_xlabel("Training Steps")
-    if i == 0:
-        sns.despine(ax=axs[i])
-        axs[i].set_ylabel("Network Output")
-        axs[i].set_yticks([-2, -1., 0., 1., 2])
-    else:
-        sns.despine(ax=axs[i], left=True)
-        axs[i].set_yticks([])
+X_train, Y_train = get_random_regression_task(batch_size, in_dim, out_dim)
 
-first_task = outputs[1]
-rng = np.linspace(0.57, 1., 10)
-for color, output in zip(blind_colours, first_task.T):
-    for val in output:
-        axs[2].plot(rng, [val]*10, c=color, lw=2.5, clip_on=False, zorder=1)
-        axs[2].plot(rng, [val]*10, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), clip_on=False, zorder=2)
-axs[2].axvline(1., linestyle="--", c="grey", lw=2.5, clip_on=False, zorder=3)
+print('model: ', type(model))
+print('X: ', X_train)
+print('Y: ', Y_train)
+print('epochs: ', type(epochs))
 
-for n, (color) in enumerate(blind_colours[:plot_items_n]):
-    axs[2].plot(-5, -5, c=color, lw=2.5, label=f"Item {n + 1}")
-axs[2].plot(-5, -5, lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label="Analytical")
 
-fig.legend(loc=7, fontsize=14, frameon=False)
-fig.tight_layout()
-fig.subplots_adjust(right=0.85)
+w1s, w2s, losses = model.train(X_train.T, Y_train.T, epochs, tau)
 
-fig.savefig("./figures/figure-1_b-c-d.svg")
 
+# analytical = QQT(init_w1, init_w2, X_train, Y_train, True)
+analytical = QQT(init_w1, init_w2, X_train, Y_train, True)
+analytical = np.asarray([analytical.forward(tau) for _ in range(epochs)])
+
+w2w1s = [w2 @ w1 for (w2, w1) in zip(w2s, w1s)]
+diffs = [np.linalg.norm(w2w1 - anal) for (w2w1, anal) in zip(w2w1s, analytical)]
+
+plt.figure()
+plt.plot(diffs)
+
+top_left_empirical = [w2w1[0][0] for w2w1 in w2w1s]
+top_left_analytical = [anal[0][0] for anal in analytical]
+
+
+
+#TODO plot trajectories of N items
+plt.plot(top_left_analytical, label='analytical')
+plt.plot(top_left_empirical, label='empirical')
+plt.title('Trajectories of top left item of both representations')
+plt.legend()
+plt.show()
+
+anal_loss = np.linalg.norm(X_train @ (analytical[-1]).T - Y_train)
+emp_loss = np.linalg.norm(X_train @ (w2w1s[-1]).T - Y_train)
+
+
+
+output_analytical = [(X_train) @ (anal).T for anal in analytical]
+output_empirical = [(X_train) @ (w2w1).T for w2w1 in w2w1s]
+
+losses_empirical = [0.5 * out_dim / batch_size * np.linalg.norm(out - Y_train)**2 for out in output_empirical]
+losses_analytical = [0.5 * out_dim / batch_size * np.linalg.norm(out - Y_train)**2 for out in output_analytical]
+
+
+plt.plot(losses_analytical, label='analytical')
+plt.plot(losses_empirical, label='empirical')
+plt.title('Loss trajectories for Analytical and Empirical Gradient Flow')
+plt.legend()
+plt.show()
+
+
+##maybe transpose wrong?
