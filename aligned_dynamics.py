@@ -21,6 +21,7 @@ from empiricalTest import LinearNetwork, get_random_regression_task
 from scipy.linalg import expm
 from empiricalTest import QQT_new
 import numpy as np
+from balanced_weights import balanced_weights
 from scipy.linalg import qr
 
 
@@ -60,6 +61,8 @@ class Aligned_Dynamics:
 
 
 ## plot of dynamics goes here
+    
+#depending on dimensions you have different dynamics
 in_dim = 5
 hidden_dim = 5
 out_dim = 5
@@ -72,12 +75,20 @@ X, Y = get_random_regression_task(batch_size, in_dim, out_dim)
 
 U, S, Vt = np.linalg.svd(1/batch_size*Y@X.T)
 
-lmda = 0.5
-a = (np.sqrt(lmda) + 1)
-b = np.sqrt(2*np.sqrt(lmda) + 1)
+# lmda = 0.5
+# a = (np.sqrt(lmda) + 1)
+# b = np.sqrt(2*np.sqrt(lmda) + 1)
 
-init_w1_hat = np.eye(hidden_dim)*a
-init_w2_hat = np.eye(hidden_dim)*b
+# init_w1_hat = np.eye(hidden_dim)*a
+# init_w2_hat = np.eye(hidden_dim)*b
+
+# w1_out, w2_out, S_test, q
+
+# init_w1_hat, init_w2_hat, _, lmda = balanced_weights(in_dim, hidden_dim, out_dim)
+
+init_w1_hat, init_w2_hat, _, lmda = balanced_weights(hidden_dim, hidden_dim, hidden_dim)
+
+lmda = np.abs(lmda[0][0])
 
 
 H = np.random.randn(hidden_dim, hidden_dim)
