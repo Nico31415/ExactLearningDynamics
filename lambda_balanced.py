@@ -95,121 +95,227 @@ def balanced_weights(in_dim, hidden_dim, out_dim):
 
 ## class that computes dynamics goes here
 #doing for equal input output dimensions (all the assumptions from Fukumizu)
-class QQT_lambda_balanced:
-    def __init__(self, init_w1, init_w2, X, Y, weights_only=False):
+# class QQT_lambda_balanced:
+#     def __init__(self, init_w1, init_w2, X, Y, weights_only=False):
 
-        self.lmda = (init_w1 @ init_w1.T - init_w2.T @ init_w2)[0][0]
+#         self.lmda = (init_w1 @ init_w1.T - init_w2.T @ init_w2)[0][0]
         
-        self.weights_only = weights_only
-        self.batch_size = X.shape[0]
+#         self.weights_only = weights_only
+#         self.batch_size = X.shape[0]
 
-        self.input_dim = X.shape[1]
-        self.output_dim = Y.shape[1]
+#         self.input_dim = X.shape[1]
+#         self.output_dim = Y.shape[1]
         
-        sigma_yx_tilde = 1 / self.batch_size * Y.T @ X 
+#         sigma_yx_tilde = 1 / self.batch_size * Y.T @ X 
 
-        U_, S_, Vt_= np.linalg.svd(sigma_yx_tilde)
-        V_ = Vt_.T 
+#         U_, S_, Vt_= np.linalg.svd(sigma_yx_tilde)
+#         V_ = Vt_.T 
 
-        self.F = np.vstack([
-        np.hstack([self.lmda / 2 * np.eye(sigma_yx_tilde.shape[1]), sigma_yx_tilde.T]),
-        np.hstack([sigma_yx_tilde, - self.lmda / 2 * np.eye(sigma_yx_tilde.shape[0])])
-        ]) 
+#         self.F = np.vstack([
+#         np.hstack([self.lmda / 2 * np.eye(sigma_yx_tilde.shape[1]), sigma_yx_tilde.T]),
+#         np.hstack([sigma_yx_tilde, - self.lmda / 2 * np.eye(sigma_yx_tilde.shape[0])])
+#         ]) 
 
-        self.U_, self.S_, self.V_ = U_, np.diag(S_), V_
+#         self.U_, self.S_, self.V_ = U_, np.diag(S_), V_
 
-        U, S, Vt  = np.linalg.svd(init_w2 @ init_w1, full_matrices=False)
-        self.U, self.S, self.V = U, S, Vt.T 
+#         U, S, Vt  = np.linalg.svd(init_w2 @ init_w1, full_matrices=False)
+#         self.U, self.S, self.V = U, S, Vt.T 
 
-        self.F_inv = np.linalg.inv(self.F)
+#         self.F_inv = np.linalg.inv(self.F)
 
-        self.O = 1/np.sqrt(2) * np.vstack([
-            np.hstack([self.V_, self.V_]),
-            np.hstack([self.U_, -self.U_])
-        ])
+#         self.O = 1/np.sqrt(2) * np.vstack([
+#             np.hstack([self.V_, self.V_]),
+#             np.hstack([self.U_, -self.U_])
+#         ])
 
-        self.lmda_big = np.vstack([
-            np.hstack([self.S_, np.zeros((self.S_.shape[0], self.S_.shape[0]))]),
-            np.hstack([np.zeros((self.S_.shape[0], self.S_.shape[0])), -1. * self.S_])
-        ])
+#         self.lmda_big = np.vstack([
+#             np.hstack([self.S_, np.zeros((self.S_.shape[0], self.S_.shape[0]))]),
+#             np.hstack([np.zeros((self.S_.shape[0], self.S_.shape[0])), -1. * self.S_])
+#         ])
 
-        self.A = np.vstack([
-        np.hstack([self.lmda / 2 * np.eye(sigma_yx_tilde.shape[1]), np.zeros((sigma_yx_tilde.shape[1], sigma_yx_tilde.shape[1]))]),
-        np.hstack([np.zeros((sigma_yx_tilde.shape[0], sigma_yx_tilde.shape[0])), - self.lmda / 2 * np.eye(sigma_yx_tilde.shape[0])])
-        ]) 
+#         self.A = np.vstack([
+#         np.hstack([self.lmda / 2 * np.eye(sigma_yx_tilde.shape[1]), np.zeros((sigma_yx_tilde.shape[1], sigma_yx_tilde.shape[1]))]),
+#         np.hstack([np.zeros((sigma_yx_tilde.shape[0], sigma_yx_tilde.shape[0])), - self.lmda / 2 * np.eye(sigma_yx_tilde.shape[0])])
+#         ]) 
 
-        self.t = 0
+#         self.t = 0
 
 
 
-    def forward(self, learning_rate):
-        #performs forward for one timestep
+#     def forward(self, learning_rate):
+#         #performs forward for one timestep
 
-        time_step = self.t * learning_rate
+#         time_step = self.t * learning_rate
 
-        i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
+#         i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
 
-        e_st_inv = np.diag(np.exp(-1. * np.diag(self.S_) * time_step))
-        e_2st_inv = np.diag(np.exp(-2. * np.diag(self.S_) * time_step))
+#         e_st_inv = np.diag(np.exp(-1. * np.diag(self.S_) * time_step))
+#         e_2st_inv = np.diag(np.exp(-2. * np.diag(self.S_) * time_step))
 
-        Sinv = np.diag(1. / self.S)
-        S_inv = np.diag(1. / np.diag(self.S_))
+#         Sinv = np.diag(1. / self.S)
+#         S_inv = np.diag(1. / np.diag(self.S_))
 
-        B_t = np.exp(-self.lmda * time_step) * self.U.T @ self.U_ + self.V.T @ self.V_
-        C_t = np.exp(-self.lmda * time_step) * self.U.T @ self.U_ - self.V.T @ self.V_
+#         B_t = np.exp(-self.lmda * time_step) * self.U.T @ self.U_ + self.V.T @ self.V_
+#         C_t = np.exp(-self.lmda * time_step) * self.U.T @ self.U_ - self.V.T @ self.V_
         
-        B_t_inv = np.linalg.inv(B_t)
+#         B_t_inv = np.linalg.inv(B_t)
 
-        # e_Ft_inv = (e -A) @ O @ (e -lmda) @ O.T 
+#         # e_Ft_inv = (e -A) @ O @ (e -lmda) @ O.T 
 
-        e_Ft_inv = expm(-1. * self.A * time_step) @ self.O @ expm(-1. * self.lmda_big * time_step) @ self.O.T
-        # e_Ft_inv = expm(-1. * self.F * time_step)
+#         e_Ft_inv = expm(-1. * self.A * time_step) @ self.O @ expm(-1. * self.lmda_big * time_step) @ self.O.T
+#         # e_Ft_inv = expm(-1. * self.F * time_step)
 
 
-        X_t = self.F_inv - e_Ft_inv @ self.F_inv @ e_Ft_inv
+#         X_t = self.F_inv - e_Ft_inv @ self.F_inv @ e_Ft_inv
 
-        e_lmda_inv = np.exp(-self.lmda * time_step)
+#         e_lmda_inv = np.exp(-self.lmda * time_step)
 
-        Z = np.vstack([
-                self.V_ @ (i - e_st_inv @ C_t.T @ B_t_inv.T @ e_st_inv),
-                self.U_ @ (i + e_st_inv @ C_t.T @ B_t_inv.T @ e_st_inv)
-            ])
+#         Z = np.vstack([
+#                 self.V_ @ (i - e_st_inv @ C_t.T @ B_t_inv.T @ e_st_inv),
+#                 self.U_ @ (i + e_st_inv @ C_t.T @ B_t_inv.T @ e_st_inv)
+#             ])
         
-        center_left = 4. * e_st_inv @ B_t_inv @ Sinv @ B_t_inv.T @ e_st_inv 
+#         center_left = 4. * e_st_inv @ B_t_inv @ Sinv @ B_t_inv.T @ e_st_inv 
 
-        center_center = 0.5 * Z.T @ X_t @ Z 
+#         center_center = 0.5 * Z.T @ X_t @ Z 
 
-        center = center_left + center_center 
+#         center = center_left + center_center 
 
-        qqt = Z @ np.linalg.inv(center) @ Z.T
+#         qqt = Z @ np.linalg.inv(center) @ Z.T
 
-        ##CHOLESKY
-        # L = np.linalg.cholesky(center)
-        # y = np.linalg.solve(L, Z.T)
-        # x = np.linalg.solve(L.T, y)
-        # qqt = x.T @ Z.T
+#         ##CHOLESKY
+#         # L = np.linalg.cholesky(center)
+#         # y = np.linalg.solve(L, Z.T)
+#         # x = np.linalg.solve(L.T, y)
+#         # qqt = x.T @ Z.T
 
         
-        if self.weights_only:
-            qqt = qqt[self.input_dim:, :self.input_dim] 
+#         if self.weights_only:
+#             qqt = qqt[self.input_dim:, :self.input_dim] 
 
-        self.t+=1
-        return qqt 
+#         self.t+=1
+#         return qqt 
     
 
-class QQT_lambda_balanced2:
+# class QQT_lambda_balanced2:
+#     def __init__(self, init_w1, init_w2, X, Y, weights_only=False):
+
+#         self.lmda = (init_w1 @ init_w1.T - init_w2.T @ init_w2)[0][0]
+
+        
+
+        
+#         self.weights_only = weights_only
+#         self.batch_size = X.shape[0]
+
+#         self.input_dim = X.shape[1]
+#         self.output_dim = Y.shape[1]
+
+#         i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
+        
+#         sigma_yx_tilde = 1 / self.batch_size * Y.T @ X 
+
+#         U_, S_, Vt_= np.linalg.svd(sigma_yx_tilde)
+#         V_ = Vt_.T 
+
+#         self.F = np.vstack([
+#         np.hstack([- self.lmda / 2 * np.eye(sigma_yx_tilde.shape[1]), sigma_yx_tilde.T]),
+#         np.hstack([sigma_yx_tilde, self.lmda / 2 * np.eye(sigma_yx_tilde.shape[0])])
+#         ]) 
+
+#         self.U_, self.S_, self.V_ = U_, np.diag(S_), V_
+
+#         U, S, Vt  = np.linalg.svd(init_w2 @ init_w1, full_matrices=False)
+#         self.U, self.S, self.V = U, S, Vt.T
+
+#         self.S_inv = np.diag(1. / np.diag(self.S_))
+
+#         self.B = U.T @ U_ + Vt @ V_
+#         # self.B = U.T @ U_ @ (i - self.lmda/2 * np.diag(self.S_inv)) + Vt @ V_ @ (i + self.lmda/2 * np.diag(self.S_inv))
+#         self.C = U.T @ U_ - Vt @ V_
+
+#         if np.isclose(np.linalg.det(self.B), 0):
+#             print('init_w1: ', init_w1)
+#             print('init_w2: ', init_w2)
+#             print('sigma_yx: ', sigma_yx_tilde)
+#             print('B: ', self.B)
+#             raise SingularMatrixError("B IS A SINGULAR MATRIX, CHECK INPUT")
+
+#         self.B_inv = np.linalg.inv(self.B)
+        
+#         self.A_0 = S
+
+#         self.t = 0
+
+
+
+#     def forward(self, learning_rate):
+#         #performs forward for one timestep
+
+#         time_step = self.t * learning_rate
+
+#         i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
+
+#         e_st_inv = np.diag(np.exp(-1. * np.diag(self.S_) * time_step))
+#         e_2st_inv = np.diag(np.exp(-2. * np.diag(self.S_) * time_step))
+
+#         S_inv = np.diag(1. / np.diag(self.S_))
+#         Sinv = np.diag(1./self.A_0)
+
+
+#         ##TODO MAYBE S FACTOR IS WRONG
+#         # S_factor = np.diag(1/(np.diag(self.S_) + self.lmda**2/4*(1/np.diag(self.S_))))
+        
+#         S_factor = np.linalg.inv(self.S_ + self.lmda**2 / 4 * self.S_inv)
+        
+        
+
+#         e_lmdat_inv = np.diag(np.exp(-1. * (np.diag(self.S_) + 1/4 * self.lmda**2 * np.diag(S_inv)) * time_step))
+#         e_2lmdat_inv = np.diag(np.exp(-2. * (np.diag(self.S_) + 1/4 * self.lmda**2 * np.diag(S_inv)) * time_step))
+
+#         Z = np.vstack([
+#             self.V_ @ ((i + self.lmda/2 *np.diag(S_inv)) - e_st_inv @ self.C.T @ self.B_inv.T @ e_lmdat_inv),
+#             self.U_ @ ((i - self.lmda/2 *np.diag(S_inv)) + e_st_inv @ self.C.T @ self.B_inv.T @ e_lmdat_inv),
+#         ])
+
+
+#         center_left = 4 * e_lmdat_inv @ self.B_inv @ Sinv @ self.B_inv.T @ e_lmdat_inv
+
+#         center_center = (i - e_2lmdat_inv) @ S_factor
+
+#         center_right = e_lmdat_inv @ self.B_inv @ self.C @ (e_2st_inv - i) @ S_inv @ self.C.T @ self.B_inv.T @ e_lmdat_inv
+
+#         center = center_left + center_center - center_right
+
+#         qqt = Z @ np.linalg.inv(center) @ Z.T
+
+#         ##CHOLESKY
+#         # L = np.linalg.cholesky(center)
+#         # y = np.linalg.solve(L, Z.T)
+#         # x = np.linalg.solve(L.T, y)
+#         # qqt = x.T @ Z.T
+
+        
+#         if self.weights_only:
+#             qqt = qqt[self.input_dim:, :self.input_dim] 
+
+#         self.t+=1
+#         return qqt 
+
+class QQT_lambda_balanced3:
     def __init__(self, init_w1, init_w2, X, Y, weights_only=False):
 
-        self.lmda = (init_w1 @ init_w1.T - init_w2.T @ init_w2)[0][0]
+        self.lmda = (init_w1 @ init_w1.T - init_w2.T @ init_w2)[0][0] 
 
         
 
-        
         self.weights_only = weights_only
         self.batch_size = X.shape[0]
 
         self.input_dim = X.shape[1]
         self.output_dim = Y.shape[1]
+
+
 
         i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
         
@@ -224,14 +330,26 @@ class QQT_lambda_balanced2:
         ]) 
 
         self.U_, self.S_, self.V_ = U_, np.diag(S_), V_
+        
 
         U, S, Vt  = np.linalg.svd(init_w2 @ init_w1, full_matrices=False)
         self.U, self.S, self.V = U, S, Vt.T
 
         self.S_inv = np.diag(1. / np.diag(self.S_))
- 
-        self.B = U.T @ U_ @ (i - self.lmda/2 * np.diag(self.S_inv)) + Vt @ V_ @ (i + self.lmda/2 * np.diag(self.S_inv))
-        self.C = U.T @ U_ - Vt @ V_
+
+        self.S_ = np.diag(self.S_)
+
+        self.X = (np.sqrt(self.lmda**2 + 4*self.S_**2) - 2 * self.S_)/self.lmda
+        self.A = 1 / (np.sqrt(1 + self.X**2))
+
+        self.X = np.diag(self.X)
+        self.A = np.diag(self.A)
+
+        self.B = U.T @ U_ @ (self.X @ self.A + self.A) + Vt @ V_ @ (self.A - self.X @ self.A)
+        self.C = U.T @ U_  @ (self.A - self.X @ self.A) - Vt @ V_ @ (self.X @ self.A + self.A)
+
+        self.eval = np.sqrt(S_**2 + self.lmda**2 / 4)
+        self.eval_inv = np.diag(1. /self.eval)
 
         if np.isclose(np.linalg.det(self.B), 0):
             print('init_w1: ', init_w1)
@@ -255,40 +373,177 @@ class QQT_lambda_balanced2:
 
         i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
 
-        e_st_inv = np.diag(np.exp(-1. * np.diag(self.S_) * time_step))
-        e_2st_inv = np.diag(np.exp(-2. * np.diag(self.S_) * time_step))
+        e_eval_st_inv  = np.diag(np.exp(-1. * self.eval * time_step))
+        e_eval_2st_inv  = np.diag(np.exp(-2. * self.eval * time_step))
 
-        S_inv = np.diag(1. / np.diag(self.S_))
+
         Sinv = np.diag(1./self.A_0)
 
-        S_factor = np.diag(1/(np.diag(self.S_) + self.lmda**2/4*(1/np.diag(self.S_))))
-        
-        
 
-        e_lmdat_inv = np.diag(np.exp(-1. * (np.diag(self.S_) + 1/4 * self.lmda**2 * np.diag(S_inv)) * time_step))
-        e_2lmdat_inv = np.diag(np.exp(-2. * (np.diag(self.S_) + 1/4 * self.lmda**2 * np.diag(S_inv)) * time_step))
 
         Z = np.vstack([
-            self.V_ @ ((i + self.lmda/2 *np.diag(S_inv)) - e_st_inv @ self.C.T @ self.B_inv.T @ e_lmdat_inv),
-            self.U_ @ ((i - self.lmda/2 *np.diag(S_inv)) + e_st_inv @ self.C.T @ self.B_inv.T @ e_lmdat_inv),
+            self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv),
+            self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv),
         ])
+        
 
 
-        center_left = 4 * e_lmdat_inv @ self.B_inv @ Sinv @ self.B_inv.T @ e_lmdat_inv
 
-        center_center = (i - e_2lmdat_inv) @ S_factor
+        center_left = 4 * e_eval_st_inv @ self.B_inv @ Sinv @ self.B_inv.T @ e_eval_st_inv
 
-        center_right = e_lmdat_inv @ self.B_inv @ self.C @ (e_2st_inv - i) @ S_inv @ self.C.T @ self.B_inv.T @ e_lmdat_inv
+        center_center = (i - e_eval_2st_inv) @ self.eval_inv
+
+        center_right = e_eval_st_inv @ self.B_inv @ self.C @ (e_eval_2st_inv - i) @ self.eval_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv
 
         center = center_left + center_center - center_right
 
-        qqt = Z @ np.linalg.inv(center) @ Z.T
+        # qqt = Z @ np.linalg.inv(center) @ Z.T
 
-        ##CHOLESKY
-        # L = np.linalg.cholesky(center)
-        # y = np.linalg.solve(L, Z.T)
-        # x = np.linalg.solve(L.T, y)
-        # qqt = x.T @ Z.T
+        #CHOLESKY
+        L = np.linalg.cholesky(center)
+        y = np.linalg.solve(L, Z.T)
+        x = np.linalg.solve(L.T, y)
+        qqt = x.T @ Z.T
+
+        
+        if self.weights_only:
+            qqt = qqt[self.input_dim:, :self.input_dim] 
+
+        self.t+=1
+        return qqt 
+
+
+
+class QQT_lambda_balanced4:
+    def __init__(self, init_w1, init_w2, X, Y, weights_only=False):
+
+        self.lmda = (init_w1 @ init_w1.T - init_w2.T @ init_w2)[0][0] 
+
+        
+
+        self.weights_only = weights_only
+        self.batch_size = X.shape[0]
+
+        self.input_dim = X.shape[1]
+        self.output_dim = Y.shape[1]
+
+
+
+        i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
+        
+        sigma_yx_tilde = 1 / self.batch_size * Y.T @ X 
+
+        U_, S_, Vt_= np.linalg.svd(sigma_yx_tilde)
+        V_ = Vt_.T 
+
+        self.F = np.vstack([
+        np.hstack([- self.lmda / 2 * np.eye(sigma_yx_tilde.shape[1]), sigma_yx_tilde.T]),
+        np.hstack([sigma_yx_tilde, self.lmda / 2 * np.eye(sigma_yx_tilde.shape[0])])
+        ]) 
+
+        self.U_, self.S_, self.V_ = U_, np.diag(S_), V_
+
+        self.dim_diff = np.abs(self.input_dim - self.output_dim)
+
+        if self.input_dim < self.output_dim:
+            U_hat = U_[:, self.input_dim:]
+            V_hat = np.zeros((self.input_dim, self.dim_diff))
+            U_ = U_[:, :self.input_dim]
+
+        elif self.input_dim > self.output_dim:
+            U_hat = np.zeros((self.output_dim, self.dim_diff))
+            V_hat = V_[:, self.output_dim:]
+            V_ = V_[:, :self.output_dim]
+        
+        else:
+            U_hat = None 
+            V_hat = None 
+
+        self.U_hat = U_hat 
+        self.V_hat = V_hat 
+        self.V_ = V_
+        self.U_ = U_
+
+        U, S, Vt  = np.linalg.svd(init_w2 @ init_w1, full_matrices=False)
+        self.U, self.S, self.V = U, S, Vt.T
+
+        self.S_inv = np.diag(1. / np.diag(self.S_))
+
+        self.S_ = np.diag(self.S_)
+
+        self.X = (np.sqrt(self.lmda**2 + 4*self.S_**2) - 2 * self.S_)/self.lmda
+        self.A = 1 / (np.sqrt(1 + self.X**2))
+
+        self.X = np.diag(self.X)
+        self.A = np.diag(self.A)
+
+        self.B = U.T @ U_ @ (self.X @ self.A + self.A) + Vt @ V_ @ (self.A - self.X @ self.A)
+        self.C = U.T @ U_  @ (self.A - self.X @ self.A) - Vt @ V_ @ (self.X @ self.A + self.A)
+
+        self.eval = np.sqrt(S_**2 + self.lmda**2 / 4)
+        self.eval_inv = np.diag(1. /self.eval)
+
+        if np.isclose(np.linalg.det(self.B), 0):
+            print('init_w1: ', init_w1)
+            print('init_w2: ', init_w2)
+            print('sigma_yx: ', sigma_yx_tilde)
+            print('B: ', self.B)
+            raise SingularMatrixError("B IS A SINGULAR MATRIX, CHECK INPUT")
+
+        self.B_inv = np.linalg.inv(self.B)
+        
+        self.A_0 = S
+
+        self.t = 0
+
+
+
+    def forward(self, learning_rate):
+        #performs forward for one timestep
+
+        time_step = self.t * learning_rate
+
+        i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
+
+        e_eval_st_inv  = np.diag(np.exp(-1. * self.eval * time_step))
+        e_eval_2st_inv  = np.diag(np.exp(-2. * self.eval * time_step))
+
+
+        Sinv = np.diag(1./self.A_0)
+
+
+        if self.U_hat is None and self.V_hat is None: 
+            Z = np.vstack([
+                self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv),
+                self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv),
+            ])
+            center_add = 0.
+        
+        else:
+            Z = np.vstack([
+                self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2*self.V_hat@self.V_hat.T @ self.V @ self.B_inv.T @ e_eval_st_inv,
+                self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv)+ 2*self.U_hat@self.U_hat.T @ self.U @ self.B_inv.T @ e_eval_st_inv
+            ])
+
+            center_add = 4 * time_step * e_eval_st_inv @ self.B_inv @ (self.V.T @ self.V_hat @ self.V_hat.T @ self.V + self.U.T @ self.U_hat @ self.U_hat.T @ self.U) @ self.B_inv.T @ e_eval_st_inv
+
+
+
+        center_left = 4 * e_eval_st_inv @ self.B_inv @ Sinv @ self.B_inv.T @ e_eval_st_inv
+
+        center_center = (i - e_eval_2st_inv) @ self.eval_inv
+
+        center_right = e_eval_st_inv @ self.B_inv @ self.C @ (e_eval_2st_inv - i) @ self.eval_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv
+
+        center = center_left + center_center - center_right + center_add
+
+        # qqt = Z @ np.linalg.inv(center) @ Z.T
+
+        #CHOLESKY
+        L = np.linalg.cholesky(center)
+        y = np.linalg.solve(L, Z.T)
+        x = np.linalg.solve(L.T, y)
+        qqt = x.T @ Z.T
 
         
         if self.weights_only:
@@ -304,19 +559,20 @@ hidden_dim = 5
 out_dim = 5
 
 batch_size = 10
-learning_rate = 0.01
-training_steps = 2
+learning_rate = 0.001
+training_steps = 1000
 
 # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
 
-# init_w1, init_w2, _, _  = balanced_weights(in_dim, hidden_dim, out_dim)
+init_w1, init_w2, _, lmda  = balanced_weights(in_dim, hidden_dim, out_dim)
+lmda = lmda[0][0]
 
-lmda = 0.5
-a = (lmda + 1)
-b = np.sqrt(2*lmda + 1)
+# lmda = 1
+# a = (lmda + 1)
+# b = np.sqrt(2*lmda + 1)
 
-init_w1 = np.eye(hidden_dim)*a
-init_w2 = np.eye(hidden_dim)*b
+# init_w1 = np.eye(hidden_dim)*a
+# init_w2 = np.eye(hidden_dim)*b
 
 # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
 
@@ -340,7 +596,7 @@ ws = np.expand_dims(ws, axis=1)
 # analytical = np.asarray([analytical.forward(learning_rate) for _ in range(training_steps)])
 
 ## analytical solution 2
-analytical2 = QQT_lambda_balanced2(init_w1.copy(), init_w2.copy(), X.T, Y.T, True)
+analytical2 = QQT_lambda_balanced3(init_w1.copy(), init_w2.copy(), X.T, Y.T, True)
 analytical2 = np.asarray([analytical2.forward(learning_rate) for _ in range(training_steps)])
 
 
@@ -377,7 +633,7 @@ for color, target in zip(blind_colours, Y[:plot_items_n]):
     for value in target:
         plt.scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
 
-plt.title('Learning Dynamics Lambda Balanced')
+plt.title(f'Learning Dynamics Lambda Balanced, Lambda: {lmda}')
 plt.xlabel('Training Steps')
 plt.ylabel('Network Output')
 plt.legend(['output', 'analytical'])
