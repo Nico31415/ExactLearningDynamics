@@ -345,10 +345,14 @@ class QQT_lambda_balanced3:
         self.X = np.diag(self.X)
         self.A = np.diag(self.A)
 
-        self.B = U.T @ U_ @ (self.X @ self.A + self.A) + Vt @ V_ @ (self.A - self.X @ self.A)
-        self.C = U.T @ U_  @ (self.A - self.X @ self.A) - Vt @ V_ @ (self.X @ self.A + self.A)
 
-        self.eval = np.sqrt(S_**2 + self.lmda**2 / 4)
+        self.S2 = np.diag(np.sqrt((self.lmda + np.sqrt(self.lmda**2 + 4*self.S**2)) / 2))
+        self.S1 = np.diag(self.S / self.S2)
+
+        self.B = self.S2 @ U.T @ U_ @ (self.X @ self.A + self.A) + self.S1 @ Vt @ V_ @ (self.A - self.X @ self.A)
+        self.C = self.S2 @ U.T @ U_  @ (self.A - self.X @ self.A) - self.S1 @ Vt @ V_ @ (self.X @ self.A + self.A)
+
+        self.eval = np.sqrt(self.S_**2 + self.lmda**2 / 4)
         self.eval_inv = np.diag(1. /self.eval)
 
         if np.isclose(np.linalg.det(self.B), 0):
@@ -359,8 +363,9 @@ class QQT_lambda_balanced3:
             raise SingularMatrixError("B IS A SINGULAR MATRIX, CHECK INPUT")
 
         self.B_inv = np.linalg.inv(self.B)
+
         
-        self.A_0 = S
+        # self.A_0 = S
 
         self.t = 0
 
@@ -377,7 +382,7 @@ class QQT_lambda_balanced3:
         e_eval_2st_inv  = np.diag(np.exp(-2. * self.eval * time_step))
 
 
-        Sinv = np.diag(1./self.A_0)
+        # Sinv = np.diag(1./self.A_0)
 
 
 
@@ -386,10 +391,9 @@ class QQT_lambda_balanced3:
             self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv),
         ])
         
+        center_left = 4 * e_eval_st_inv @ self.B_inv @ self.B_inv.T @ e_eval_st_inv
 
-
-
-        center_left = 4 * e_eval_st_inv @ self.B_inv @ Sinv @ self.B_inv.T @ e_eval_st_inv
+        # center_left = 4 * e_eval_st_inv @ self.B_inv @ Sinv @ self.B_inv.T @ e_eval_st_inv
 
         center_center = (i - e_eval_2st_inv) @ self.eval_inv
 
@@ -505,7 +509,7 @@ class QQT_lambda_balanced4:
 
         i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
 
-        e_eval_st_inv  = np.diag(np.exp(-1. * self.eval * time_step))
+        e_eval_st_inv  =  np.diag(np.exp(-1. * self.eval * time_step))
         e_eval_2st_inv  = np.diag(np.exp(-2. * self.eval * time_step))
 
 
@@ -554,15 +558,15 @@ class QQT_lambda_balanced4:
 
 
 ## plot of dynamics goes here
-in_dim = 5
-hidden_dim = 5
-out_dim = 5
+in_dim = 1
+hidden_dim = 1
+out_dim = 1
 
-lmda = 0.5
+lmda = 1
 
 batch_size = 10
 learning_rate = 0.001 / lmda
-training_steps = 1000
+training_steps = int(200 * np.sqrt(lmda))
 
 # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
 
@@ -570,8 +574,8 @@ training_steps = 1000
 # lmda = lmda[0][0]
 
 
-a = (lmda + 1)
-b = np.sqrt(2*lmda + 1)
+a = (np.sqrt(lmda) + 1)
+b = np.sqrt(2*np.sqrt(lmda) + 1)
 
 init_w1 = np.eye(hidden_dim)*a
 init_w2 = np.eye(hidden_dim)*b
@@ -586,6 +590,10 @@ print((init_w1@init_w1.T - init_w2.T@init_w2)[0][0])
 
 X, Y = get_random_regression_task(batch_size, in_dim, out_dim)
 
+U_, S_, Vt_ = np.linalg.svd(Y @ X.T / batch_size)
+
+
+
 
 ## model solution
 model = LinearNetwork(in_dim, hidden_dim, out_dim, init_w1.copy(), init_w2.copy())
@@ -593,13 +601,27 @@ w1s, w2s, losses = model.train(X, Y, training_steps, learning_rate)
 ws = np.array([w2 @ w1 for (w2, w1) in zip(w2s, w1s)])
 ws = np.expand_dims(ws, axis=1)
 
+
+
 # analytical solution 1 (for comparision)
 # analytical = QQT_new(init_w1.copy(), init_w2.copy(), X.T, Y.T, True)
 # analytical = np.asarray([analytical.forward(learning_rate) for _ in range(training_steps)])
 
 ## analytical solution 2
-analytical2 = QQT_lambda_balanced3(init_w1.copy(), init_w2.copy(), X.T, Y.T, True)
+analytical2 = QQT_lambda_balanced3(init_w1.copy(), init_w2.copy(), X.T, Y.T, False)
 analytical2 = np.asarray([analytical2.forward(learning_rate) for _ in range(training_steps)])
+
+# X_ = (np.sqrt(lmda**2 + 4*S_**2) - 2 * S_)/lmda
+# A = 1 / (np.sqrt(1 + X**2))
+
+rep1 = [[w1.T @ w1] for w1 in w1s]
+rep1_analytical = np.array([a[:in_dim, :in_dim] for a in analytical2])
+
+rep2= [[w2 @ w2.T] for w2 in w2s]
+rep2_analytical = np.array([a[in_dim:, in_dim:] for a in analytical2])
+
+reps = (np.asarray(rep2)[:, 0, :, :])
+
 
 
 # diffs = [np.linalg.norm(a - w) for (a, w) in zip(analytical, analytical2)]
@@ -625,7 +647,47 @@ blind_colours = BlindColours().get_colours()
 
 outputs = (np.asarray(ws)[:, 0, :, :] @ X[:,:plot_items_n])
 
+# representations = (np.asarray(w1s))
 
+plt.figure()
+reps = (np.asarray(rep2)[:, 0, :, :])
+for color, output in zip(blind_colours, reps.T):
+    for val in output:
+        plt.plot(val, c=color, lw=2.5, label='Representation')
+    plt.plot((rep1_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
+    
+for color, target in zip(blind_colours, Y[:plot_items_n]):
+    for value in target:
+        plt.scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
+
+plt.title(f'Representation Dynamics Lambda Balanced, Lambda: {lmda}')
+plt.xlabel('Training Steps')
+plt.ylabel('Network Representation (W2)')
+plt.legend(['output', 'analytical'])
+
+
+plt.figure()
+reps = (np.asarray(rep1)[:, 0, :, :])
+for color, output in zip(blind_colours, reps.T):
+    for val in output:
+        plt.plot(val, c=color, lw=2.5, label='Representation')
+    plt.plot((rep2_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
+    
+for color, target in zip(blind_colours, Y[:plot_items_n]):
+    for value in target:
+        plt.scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
+
+plt.title(f'Representation Dynamics Lambda Balanced, Lambda: {lmda}')
+plt.xlabel('Training Steps')
+plt.ylabel('Network Representation (W1)')
+plt.legend(['output', 'analytical'])
+
+
+
+
+plt.figure()
+
+analytical2 = [a[in_dim:, :in_dim] for a in analytical2]
 for color, output in zip(blind_colours, outputs.T):
     for val in output:
         plt.plot(val, c=color, lw=2.5, label='output')

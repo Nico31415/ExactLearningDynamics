@@ -36,7 +36,7 @@ X, Y = get_random_regression_task(batch_size, in_dim, out_dim)
 sigma_yx = 1/batch_size * Y @ X.T 
 
 
-lmda = 5
+lmda = 0.5
 
 def get_F(lmda):
     F = np.vstack([
@@ -75,21 +75,53 @@ O2 = np.vstack([
     np.hstack([-lmda/2 * np.diag(1/S), np.eye(S.shape[0])])
 ])
 
-O_final = 1/np.sqrt(2) * np.vstack([
-    np.hstack([factor @ (np.eye(S.shape[0]) + off_diag) @ Vt, factor @ (np.eye(S.shape[0]) - off_diag) @ U.T ]),
-    np.hstack([factor @ (np.eye(S.shape[0]) - off_diag) @ Vt, -factor @ (np.eye(S.shape[0]) + off_diag) @ U.T])
-])
+# O_final = 1/np.sqrt(2) * np.vstack([
+#     np.hstack([factor @ (np.eye(S.shape[0]) + off_diag) @ Vt, factor @ (np.eye(S.shape[0]) - off_diag) @ U.T ]),
+#     np.hstack([factor @ (np.eye(S.shape[0]) - off_diag) @ Vt, -factor @ (np.eye(S.shape[0]) + off_diag) @ U.T])
+# ])
+
+# O_final = 1/np.sqrt(2) * np.vstack([
+#     np.hstack([factor @ (np.eye(S.shape[0]) - off_diag) @ Vt, -factor @ (np.eye(S.shape[0]) + off_diag) @ U.T ]),
+#     np.hstack([factor @ (np.eye(S.shape[0]) + off_diag) @ Vt, factor @ (np.eye(S.shape[0]) - off_diag) @ U.T])
+# ])
+
+# O_final = 1/np.sqrt(2) * np.vstack([
+#     np.hstack([Vt.T @ (np.eye(S.shape[0]) - off_diag) @ factor, Vt.T @ (np.eye(S.shape[0]) + off_diag) @ factor]),
+#     np.hstack([-U @ (np.eye(S.shape[0]) + off_diag) @ factor, U @ (np.eye(S.shape[0]) - off_diag) @ factor])
+# ])
+
+
+
 
 evals = np.sqrt(lmda**2/4 + S**2)
 
-D = np.diag(np.concatenate((-evals, evals)))
+D = np.diag(np.concatenate((evals, -evals)))
 
 # print(O2.T @ theoretical_diag @ O2)
 # sns.heatmap(O2.T @ theoretical_diag @ O2)
 # plt.show()
 
 
+A = np.diag(np.sqrt(1/(1 + (lmda / (2 * S - np.sqrt(lmda**2 + 4*S**2)))**2)))
 
+X = np.diag(lmda / (2 * S - np.sqrt(lmda**2 + 4 * S ** 2)))
+
+I = np.eye(S.shape[0])
+
+P = np.vstack([
+    np.hstack([X @ A, A]),
+    np.hstack([A, -X@A])
+])
+
+O_final = 1/np.sqrt(2) * np.vstack([
+    np.hstack([Vt.T @ (X + I) @ A, Vt.T @ (X - I) @ A]),
+    np.hstack([U @ (X - I) @ A, -U @ (X + I) @ A])
+])
+
+# O_final = 1/np.sqrt(2) * np.vstack([
+#     np.hstack([Vt.T @ (I - X) @ A, Vt.T @ (I + X) @ A]),
+#     np.hstack([U @ (I + X) @ A, -U @ (I - X) @ A])
+# ])
 
 
 # lmda = 100
@@ -106,11 +138,15 @@ O3 = 1/np.sqrt(2) * np.vstack([
     np.hstack([Vt, -U.T])
     ])
 
+# P = np.vstack([
+#     np.hstack([np.diag(lmda/(2*S + np.sqrt(lmda**2+4*S**2))), np.eye(S.shape[0])]),
+#     np.hstack([np.diag(lmda/(2*S - np.sqrt(lmda**2+4*S**2))), np.eye(S.shape[0])])
+# ])
+
 P = np.vstack([
-    np.hstack([np.diag(lmda/(2*S + np.sqrt(lmda**2+4*S**2))), np.eye(S.shape[0])]),
+    np.hstack([np.diag(lmda/(2*S - np.sqrt(lmda**2+4*S**2))), np.eye(S.shape[0])]),
     np.hstack([np.diag(lmda/(2*S - np.sqrt(lmda**2+4*S**2))), np.eye(S.shape[0])])
 ])
-
 
 diagonal = np.vstack([
     np.hstack([np.diag(S) + lmda**2 /4 * np.diag(1/S), np.zeros((S.shape[0], S.shape[0]))]),

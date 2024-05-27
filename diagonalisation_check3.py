@@ -69,6 +69,11 @@ P = np.vstack([
     np.hstack([-X @ A, A])
 ])
 
+O_final = 1/np.sqrt(2) * np.vstack([
+    np.hstack([Vt.T @ (A - X@ A), Vt.T @ (A + X@A)]),
+    np.hstack([U @ (A + X @ A), - U @ (A - X@ A)])
+])
+
 evals = np.sqrt(lmda**2/4 + S**2)
 
 D = np.diag(np.concatenate((evals, -evals)))
