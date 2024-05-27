@@ -522,7 +522,7 @@ class QQT_lambda_balanced4:
         else:
             Z = np.vstack([
                 self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2*self.V_hat@self.V_hat.T @ self.V @ self.B_inv.T @ e_eval_st_inv,
-                self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv)+ 2*self.U_hat@self.U_hat.T @ self.U @ self.B_inv.T @ e_eval_st_inv
+                self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2*self.U_hat@self.U_hat.T @ self.U @ self.B_inv.T @ e_eval_st_inv
             ])
 
             center_add = 4 * time_step * e_eval_st_inv @ self.B_inv @ (self.V.T @ self.V_hat @ self.V_hat.T @ self.V + self.U.T @ self.U_hat @ self.U_hat.T @ self.U) @ self.B_inv.T @ e_eval_st_inv
@@ -558,21 +558,23 @@ in_dim = 5
 hidden_dim = 5
 out_dim = 5
 
+lmda = 0.5
+
 batch_size = 10
-learning_rate = 0.001
+learning_rate = 0.001 / lmda
 training_steps = 1000
 
 # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
 
-init_w1, init_w2, _, lmda  = balanced_weights(in_dim, hidden_dim, out_dim)
-lmda = lmda[0][0]
+# init_w1, init_w2, _, lmda  = balanced_weights(in_dim, hidden_dim, out_dim)
+# lmda = lmda[0][0]
 
-# lmda = 1
-# a = (lmda + 1)
-# b = np.sqrt(2*lmda + 1)
 
-# init_w1 = np.eye(hidden_dim)*a
-# init_w2 = np.eye(hidden_dim)*b
+a = (lmda + 1)
+b = np.sqrt(2*lmda + 1)
+
+init_w1 = np.eye(hidden_dim)*a
+init_w2 = np.eye(hidden_dim)*b
 
 # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
 

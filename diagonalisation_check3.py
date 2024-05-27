@@ -22,9 +22,9 @@ from empiricalTest import QQT_new
 from empiricalTest import LinearNetwork
 from empiricalTest import get_random_regression_task
 
-in_dim = 4
+in_dim = 5
 hidden_dim = 5
-out_dim = 3
+out_dim = 5
 
 batch_size = 10
 
@@ -34,7 +34,7 @@ X, Y = get_random_regression_task(batch_size, in_dim, out_dim)
 sigma_yx = 1/batch_size * Y @ X.T 
 
 
-lmda = 0.5
+lmda = 100
 
 def get_F(lmda):
     F = np.vstack([
