@@ -141,7 +141,7 @@ def whiten(X):
     scaler = StandardScaler()
     X_standardised = scaler.fit_transform(X)
 
-    print('X standardised: ', X_standardised)
+    # print('X standardised: ', X_standardised)
     
     pca = PCA()
     X_pca = pca.fit_transform(X_standardised)

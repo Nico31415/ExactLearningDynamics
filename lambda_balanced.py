@@ -1,26 +1,27 @@
-import gooseberry as gs
-from dynamics import QQT
-from tools import BlindColours, zero_balanced_weights
+# import gooseberry as gs
+# from dynamics import QQT
+# from tools import BlindColours, zero_balanced_weights
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+# import numpy as np
 
-import torch
-import torch.nn as nn 
-import torch.optim as optim
+# import torch
+# import torch.nn as nn 
+# import torch.optim as optim
 
 import matplotlib.pyplot as plt 
 import numpy as np
 
-from sklearn.preprocessing import StandardScaler 
-from sklearn.decomposition import PCA
+# from sklearn.preprocessing import StandardScaler 
+# from sklearn.decomposition import PCA
 import seaborn as sns
-from tools import BlindColours, zero_balanced_weights
-from empiricalTest import LinearNetwork, get_random_regression_task
-from scipy.linalg import expm
-from empiricalTest import QQT_new
-from balanced_weights import balanced_weights
+# from tools import BlindColours, zero_balanced_weights
+# from empiricalTest import LinearNetwork, get_random_regression_task
+# from scipy.linalg import expm
+# from empiricalTest import QQT_new
+# from balanced_weights import balanced_weights
+from utils import SingularMatrixError
 
 
 
@@ -28,71 +29,71 @@ from balanced_weights import balanced_weights
 ##implement the solution for lambda balanced weights, see if it works
 
 
-class SingularMatrixError(Exception):
-    """Exception raised when a matrix is singular."""
-    pass
+# class SingularMatrixError(Exception):
+#     """Exception raised when a matrix is singular."""
+#     pass
 
 ##method for generating lambda balanced weights goes here
 
-def reshape_matrix(input_matrix, new_shape):
+# def reshape_matrix(input_matrix, new_shape):
 
-    old_shape = input_matrix.shape
+#     old_shape = input_matrix.shape
     
-    if new_shape[0] > old_shape[0]:
+#     if new_shape[0] > old_shape[0]:
 
-        new_matrix = np.vstack((input_matrix, np.zeros((new_shape[0] - old_shape[0], old_shape[1]))))
-    elif new_shape[0] < old_shape[0]:
+#         new_matrix = np.vstack((input_matrix, np.zeros((new_shape[0] - old_shape[0], old_shape[1]))))
+#     elif new_shape[0] < old_shape[0]:
 
-        new_matrix = input_matrix[:new_shape[0], :]
-    else:
-        new_matrix = input_matrix
+#         new_matrix = input_matrix[:new_shape[0], :]
+#     else:
+#         new_matrix = input_matrix
     
-    if new_shape[1] > old_shape[1]:
-        new_matrix = np.hstack((new_matrix, np.zeros((new_shape[0], new_shape[1] - old_shape[1]))))
-    elif new_shape[1] < old_shape[1]:
-        new_matrix = new_matrix[:, :new_shape[1]]
+#     if new_shape[1] > old_shape[1]:
+#         new_matrix = np.hstack((new_matrix, np.zeros((new_shape[0], new_shape[1] - old_shape[1]))))
+#     elif new_shape[1] < old_shape[1]:
+#         new_matrix = new_matrix[:, :new_shape[1]]
     
-    return new_matrix
+#     return new_matrix
 
-def balanced_weights(in_dim, hidden_dim, out_dim):
+# def balanced_weights(in_dim, hidden_dim, out_dim):
 
-    sigma = 1
+#     sigma = 1
 
-    U, S, V = np.linalg.svd(np.random.randn(hidden_dim, hidden_dim))
-    r = U @ V.T
+#     U, S, V = np.linalg.svd(np.random.randn(hidden_dim, hidden_dim))
+#     r = U @ V.T
 
-    w1 = np.random.randn(hidden_dim, in_dim)
-    w2 = np.random.randn(out_dim, hidden_dim)
+#     w1 = np.random.randn(hidden_dim, in_dim)
+#     w2 = np.random.randn(out_dim, hidden_dim)
 
-    U_, S_, V_ = np.linalg.svd(w2 @ w1)
-    s = np.sqrt(np.diag(S_))
+#     U_, S_, V_ = np.linalg.svd(w2 @ w1)
+#     s = np.sqrt(np.diag(S_))
 
-    lmda = np.trace(w2 @ w1) / hidden_dim
+#     lmda = np.trace(w2 @ w1) / hidden_dim
 
-    factor = (- lmda + np.sqrt(lmda ** 2 + 4 * s ** 2)) / 2
+#     factor = (- lmda + np.sqrt(lmda ** 2 + 4 * s ** 2)) / 2
 
-    s_2 = np.sqrt(np.diag(np.diag(factor)))
+#     s_2 = np.sqrt(np.diag(np.diag(factor)))
 
-    s2_reshaped = reshape_matrix(s_2, (out_dim, hidden_dim))
+#     s2_reshaped = reshape_matrix(s_2, (out_dim, hidden_dim))
 
-    s_1 = np.diag(np.diag(s) / np.diag(s_2))
+#     s_1 = np.diag(np.diag(s) / np.diag(s_2))
 
-    s1_reshaped = reshape_matrix(s_1, (hidden_dim, in_dim))
+#     s1_reshaped = reshape_matrix(s_1, (hidden_dim, in_dim))
 
-    S_test = s2_reshaped @ s1_reshaped
+#     S_test = s2_reshaped @ s1_reshaped
 
-    w1_out = r @ s1_reshaped @ V_.T 
+#     w1_out = r @ s1_reshaped @ V_.T 
 
-    w2_out = U_ @ s2_reshaped @ r.T
+#     w2_out = U_ @ s2_reshaped @ r.T
 
-    q = w1_out @ w1_out.T - w2_out.T @ w2_out
+#     q = w1_out @ w1_out.T - w2_out.T @ w2_out
 
-    scale_by = lmda / q[0][0]
-    w1_out = scale_by * w1_out
-    w2_out = scale_by * w2_out
-    q = w1_out @ w1_out.T - w2_out.T @ w2_out
+#     scale_by = lmda / q[0][0]
+#     w1_out = scale_by * w1_out
+#     w2_out = scale_by * w2_out
+#     q = w1_out @ w1_out.T - w2_out.T @ w2_out
 
-    return w1_out, w2_out, S_test, q
+#     return w1_out, w2_out, S_test, q
 
 ## class that computes dynamics goes here
 #doing for equal input output dimensions (all the assumptions from Fukumizu)
@@ -322,6 +323,8 @@ class QQT_lambda_balanced3:
 
         i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
         
+        # sigma_yx_tilde = 1 / self.batch_size * Y.T @ X 
+    
         sigma_yx_tilde = 1 / self.batch_size * Y.T @ X 
 
         U_, S_, Vt_= np.linalg.svd(sigma_yx_tilde)
@@ -357,7 +360,6 @@ class QQT_lambda_balanced3:
 
         self.S1 = np.diag(self.S1)
         self.S2 = np.diag(self.S2)
-
         self.B = self.S2 @ U.T @ U_ @ (self.X @ self.A + self.A) + self.S1 @ Vt @ V_ @ (self.A - self.X @ self.A)
         self.C = self.S2 @ U.T @ U_  @ (self.A - self.X @ self.A) - self.S1 @ Vt @ V_ @ (self.X @ self.A + self.A)
 
@@ -410,17 +412,17 @@ class QQT_lambda_balanced3:
 
         center = center_left + center_center - center_right
 
-        # qqt = Z @ np.linalg.inv(center) @ Z.T
+        qqt = Z @ np.linalg.inv(center) @ Z.T
 
         #CHOLESKY
-        L = np.linalg.cholesky(center)
-        y = np.linalg.solve(L, Z.T)
-        x = np.linalg.solve(L.T, y)
-        qqt = x.T @ Z.T
+        # L = np.linalg.cholesky(center)
+        # y = np.linalg.solve(L, Z.T)
+    # x = np.linalg.solve(L.T, y)
+        # qqt = x.T @ Z.T
 
         self.hidden_dim = len(self.init_w1)
 
-        add_term = np.diag([self.lmda for _ in range(self.hidden_dim)] + [-self.lmda for _ in range(self.hidden_dim)])
+        add_term = np.diag([self.lmda for _ in range(self.input_dim)] + [-self.lmda for _ in range(self.input_dim)])
 
         qqt = qqt + add_term
 
@@ -577,156 +579,156 @@ class QQT_lambda_balanced3:
 
 
 ## plot of dynamics goes here
-in_dim = 5
-hidden_dim = 5
-out_dim = 5
+# in_dim = 5
+# hidden_dim = 5
+# out_dim = 5
 
-lmda = 100
+# lmda = 100
 
-batch_size = 10
-learning_rate = 0.001 / lmda
-training_steps = int(200 * np.sqrt(lmda))
+# batch_size = 10
+# learning_rate = 0.001 / lmda
+# training_steps = int(200 * np.sqrt(lmda))
 
-# init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
+# # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
 
-# init_w1, init_w2, _, lmda  = balanced_weights(in_dim, hidden_dim, out_dim)
-# lmda = lmda[0][0]
+# # init_w1, init_w2, _, lmda  = balanced_weights(in_dim, hidden_dim, out_dim)
+# # lmda = lmda[0][0]
                          
 
-b = (np.sqrt(lmda) + 1)
-a = np.sqrt(2*np.sqrt(lmda) + 1)
+# b = (np.sqrt(lmda) + 1)
+# a = np.sqrt(2*np.sqrt(lmda) + 1)
 
-init_w1 = np.eye(hidden_dim)*a
-init_w2 = np.eye(hidden_dim)*b
+# init_w1 = np.eye(hidden_dim)*a
+# init_w2 = np.eye(hidden_dim)*b
 
-print("lambda: " ,init_w2.T @ init_w2 - init_w1 @ init_w1.T)
-
-
-# init_w1 = np.eye(hidden_dim)*b
-# init_w2 = np.eye(hidden_dim)*a
-
-# init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
-
-#lets try with lmda = 1
+# print("lambda: " ,init_w2.T @ init_w2 - init_w1 @ init_w1.T)
 
 
-print((init_w1@init_w1.T - init_w2.T@init_w2)[0][0])
+# # init_w1 = np.eye(hidden_dim)*b
+# # init_w2 = np.eye(hidden_dim)*a
+
+# # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
+
+# #lets try with lmda = 1
 
 
-X, Y = get_random_regression_task(batch_size, in_dim, out_dim)
-
-U_, S_, Vt_ = np.linalg.svd(Y @ X.T / batch_size)
+# print((init_w1@init_w1.T - init_w2.T@init_w2)[0][0])
 
 
+# X, Y = get_random_regression_task(batch_size, in_dim, out_dim)
 
-
-## model solution
-model = LinearNetwork(in_dim, hidden_dim, out_dim, init_w1.copy(), init_w2.copy())
-w1s, w2s, losses = model.train(X, Y, training_steps, learning_rate)
-ws = np.array([w2 @ w1 for (w2, w1) in zip(w2s, w1s)])
-ws = np.expand_dims(ws, axis=1)
+# U_, S_, Vt_ = np.linalg.svd(Y @ X.T / batch_size)
 
 
 
-# analytical solution 1 (for comparision)
-# analytical = QQT_new(init_w1.copy(), init_w2.copy(), X.T, Y.T, True)
-# analytical = np.asarray([analytical.forward(learning_rate) for _ in range(training_steps)])
 
-## analytical solution 2
-analytical2 = QQT_lambda_balanced3(init_w1.copy(), init_w2.copy(), X.T, Y.T, False)
-analytical2 = np.asarray([analytical2.forward(learning_rate) for _ in range(training_steps)])
-
-# X_ = (np.sqrt(lmda**2 + 4*S_**2) - 2 * S_)/lmda
-# A = 1 / (np.sqrt(1 + X**2))
-
-# rep1 = [[w1.T @ w1 - lmda * np.eye(hidden_dim)] for w1 in w1s]
-rep1 = [[w1.T @ w1] for w1 in w1s]
-rep1_analytical = np.array([a[:in_dim, :in_dim] for a in analytical2])
-
-# rep2= [[w2 @ w2.T + lmda * np.eye(hidden_dim)] for w2 in w2s]
-rep2= [[w2 @ w2.T] for w2 in w2s]
-rep2_analytical = np.array([a[in_dim:, in_dim:] for a in analytical2])
-
-reps = (np.asarray(rep2)[:, 0, :, :])
+# ## model solution
+# model = LinearNetwork(in_dim, hidden_dim, out_dim, init_w1.copy(), init_w2.copy())
+# w1s, w2s, losses = model.train(X, Y, training_steps, learning_rate)
+# ws = np.array([w2 @ w1 for (w2, w1) in zip(w2s, w1s)])
+# ws = np.expand_dims(ws, axis=1)
 
 
 
-# diffs = [np.linalg.norm(a - w) for (a, w) in zip(analytical, analytical2)]
-# print(diffs[:20])
-# print(diffs[-20:])
-# first_a  = [a[0][0] for a in analytical]
-# first_emp = [w[0][0][0] for w in ws]
+# # analytical solution 1 (for comparision)
+# # analytical = QQT_new(init_w1.copy(), init_w2.copy(), X.T, Y.T, True)
+# # analytical = np.asarray([analytical.forward(learning_rate) for _ in range(training_steps)])
+
+# ## analytical solution 2
+# analytical2 = QQT_lambda_balanced3(init_w1.copy(), init_w2.copy(), X.T, Y.T, False)
+# analytical2 = np.asarray([analytical2.forward(learning_rate) for _ in range(training_steps)])
+
+# # X_ = (np.sqrt(lmda**2 + 4*S_**2) - 2 * S_)/lmda
+# # A = 1 / (np.sqrt(1 + X**2))
+
+# # rep1 = [[w1.T @ w1 - lmda * np.eye(hidden_dim)] for w1 in w1s]
+# rep1 = [[w1.T @ w1] for w1 in w1s]
+# rep1_analytical = np.array([a[:in_dim, :in_dim] for a in analytical2])
+
+# # rep2= [[w2 @ w2.T + lmda * np.eye(hidden_dim)] for w2 in w2s]
+# rep2= [[w2 @ w2.T] for w2 in w2s]
+# rep2_analytical = np.array([a[in_dim:, in_dim:] for a in analytical2])
+
+# reps = (np.asarray(rep2)[:, 0, :, :])
+
+
+
+# # diffs = [np.linalg.norm(a - w) for (a, w) in zip(analytical, analytical2)]
+# # print(diffs[:20])
+# # print(diffs[-20:])
+# # first_a  = [a[0][0] for a in analytical]
+# # first_emp = [w[0][0][0] for w in ws]
+
+# # plt.figure()
+# # plt.plot(first_a, label = 'analytical')
+# # plt.plot(first_emp, label='empirical')
+# # plt.legend()
+# # plt.show()
+
+
+# # print(diffs)
+
+
+# ### PLOTTING TRAJECTORIES OF THE REPRESENTATIONS
+# plot_items_n = 4
+# blind_colours = BlindColours().get_colours()
+
+
+# outputs = (np.asarray(ws)[:, 0, :, :] @ X[:,:plot_items_n])
+
+# # representations = (np.asarray(w1s))
 
 # plt.figure()
-# plt.plot(first_a, label = 'analytical')
-# plt.plot(first_emp, label='empirical')
-# plt.legend()
+# reps = (np.asarray(rep2)[:, 0, :, :])
+# for color, output in zip(blind_colours, reps.T):
+#     for val in output:
+#         plt.plot(val, c=color, lw=2.5, label='Representation')
+#     plt.plot((rep2_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
+    
+# for color, target in zip(blind_colours, Y[:plot_items_n]):
+#     for value in target:
+#         plt.scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
+
+# plt.title(f'Representation Dynamics Lambda Balanced, Lambda: {lmda}')
+# plt.xlabel('Training Steps')
+# plt.ylabel('Network Representation (W2)')
+# plt.legend(['output', 'analytical'])
+
+
+# plt.figure()
+# reps = (np.asarray(rep1)[:, 0, :, :])
+# for color, output in zip(blind_colours, reps.T):
+#     for val in output:
+#         plt.plot(val, c=color, lw=2.5, label='Representation')
+#     plt.plot((rep1_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
+    
+# for color, target in zip(blind_colours, Y[:plot_items_n]):
+#     for value in target:
+#         plt.scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
+
+# plt.title(f'Representation Dynamics Lambda Balanced, Lambda: {lmda}')
+# plt.xlabel('Training Steps')
+# plt.ylabel('Network Representation (W1)')
+# plt.legend(['output', 'analytical'])
+
+
+
+
+# plt.figure()
+
+# analytical2 = [a[in_dim:, :in_dim] for a in analytical2]
+# for color, output in zip(blind_colours, outputs.T):
+#     for val in output:
+#         plt.plot(val, c=color, lw=2.5, label='output')
+#     plt.plot((analytical2 @ X[:,:plot_items_n]).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
+    
+# for color, target in zip(blind_colours, Y[:plot_items_n]):
+#     for value in target:
+#         plt.scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
+
+# plt.title(f'Learning Dynamics Lambda Balanced, Lambda: {lmda}')
+# plt.xlabel('Training Steps')
+# plt.ylabel('Network Output')
+# plt.legend(['output', 'analytical'])
+
 # plt.show()
-
-
-# print(diffs)
-
-
-### PLOTTING TRAJECTORIES OF THE REPRESENTATIONS
-plot_items_n = 4
-blind_colours = BlindColours().get_colours()
-
-
-outputs = (np.asarray(ws)[:, 0, :, :] @ X[:,:plot_items_n])
-
-# representations = (np.asarray(w1s))
-
-plt.figure()
-reps = (np.asarray(rep2)[:, 0, :, :])
-for color, output in zip(blind_colours, reps.T):
-    for val in output:
-        plt.plot(val, c=color, lw=2.5, label='Representation')
-    plt.plot((rep2_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
-    
-for color, target in zip(blind_colours, Y[:plot_items_n]):
-    for value in target:
-        plt.scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
-
-plt.title(f'Representation Dynamics Lambda Balanced, Lambda: {lmda}')
-plt.xlabel('Training Steps')
-plt.ylabel('Network Representation (W2)')
-plt.legend(['output', 'analytical'])
-
-
-plt.figure()
-reps = (np.asarray(rep1)[:, 0, :, :])
-for color, output in zip(blind_colours, reps.T):
-    for val in output:
-        plt.plot(val, c=color, lw=2.5, label='Representation')
-    plt.plot((rep1_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
-    
-for color, target in zip(blind_colours, Y[:plot_items_n]):
-    for value in target:
-        plt.scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
-
-plt.title(f'Representation Dynamics Lambda Balanced, Lambda: {lmda}')
-plt.xlabel('Training Steps')
-plt.ylabel('Network Representation (W1)')
-plt.legend(['output', 'analytical'])
-
-
-
-
-plt.figure()
-
-analytical2 = [a[in_dim:, :in_dim] for a in analytical2]
-for color, output in zip(blind_colours, outputs.T):
-    for val in output:
-        plt.plot(val, c=color, lw=2.5, label='output')
-    plt.plot((analytical2 @ X[:,:plot_items_n]).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
-    
-for color, target in zip(blind_colours, Y[:plot_items_n]):
-    for value in target:
-        plt.scatter(training_steps * 1.6, value, marker="_", color=color, lw=2.5)
-
-plt.title(f'Learning Dynamics Lambda Balanced, Lambda: {lmda}')
-plt.xlabel('Training Steps')
-plt.ylabel('Network Output')
-plt.legend(['output', 'analytical'])
-
-plt.show()

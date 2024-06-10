@@ -16,12 +16,15 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler 
 from sklearn.decomposition import PCA
 import seaborn as sns
-from tools import BlindColours, zero_balanced_weights
-from empiricalTest import LinearNetwork, get_random_regression_task
-from scipy.linalg import expm
-from empiricalTest import QQT_new
-from balanced_weights import balanced_weights
+# from tools import BlindColours, zero_balanced_weights
+# from empiricalTest import LinearNetwork, get_random_regression_task
+# from scipy.linalg import expm
+# from empiricalTest import QQT_new
+# from balanced_weights import balanced_weights
 
+
+from utils import get_lambda_balanced, get_random_regression_task
+from linear_network import LinearNetwork
 class SingularMatrixError(Exception):
     """Exception raised when a matrix is singular."""
     pass
@@ -29,7 +32,7 @@ class SingularMatrixError(Exception):
 class QQT_lambda_balanced3:
     def __init__(self, init_w1, init_w2, X, Y, weights_only=False):
 
-        self.lmda = (init_w1 @ init_w1.T - init_w2.T @ init_w2)[0][0] 
+        self.lmda = (init_w2.T @ init_w2 - init_w1 @ init_w1.T)[0][0] 
 
         
 
@@ -74,7 +77,8 @@ class QQT_lambda_balanced3:
         self.U_hat, self.V_hat = U_hat, V_hat
         self.U_, self.V_ = U_, V_
 
-        U, S, Vt  = np.linalg.svd(init_w2 @ init_w1, full_matrices=False)
+        # U, S, Vt  = np.linalg.svd(init_w2 @ init_w1, full_matrices=False)
+        U, S, Vt  = np.linalg.svd(init_w2 @ init_w1)
         self.U, self.S, self.V = U, S, Vt.T
 
         self.S_inv = np.diag(1. / np.diag(self.S_))
@@ -89,13 +93,44 @@ class QQT_lambda_balanced3:
 
 
         self.S2 = np.sqrt((self.lmda + np.sqrt(self.lmda**2 + 4*self.S**2)) / 2)
-        self.S1 = self.S / self.S2
 
-        self.S1 = np.diag(self.S1)
-        self.S2 = np.diag(self.S2)
+        # _ , self.S2, _ = np.linalg.svd(init_w2)
+        # _ , self.S1, _ = np.linalg.svd(init_w2)
 
-        self.B = self.S2 @ U.T @ U_ @ (self.X @ self.A + self.A) + self.S1 @ Vt @ V_ @ (self.A - self.X @ self.A)
-        self.C = self.S2 @ U.T @ U_  @ (self.A - self.X @ self.A) - self.S1 @ Vt @ V_ @ (self.X @ self.A + self.A)
+        # S2_equal_dim = (np.sqrt((np.sqrt(lmda**2 + 4 * S**2) + lmda) / 2))
+        # S1_equal_dim = (np.sqrt((np.sqrt(lmda**2 + 4 * S**2) - lmda) / 2))
+
+        # if out_dim > in_dim:
+        #     add_terms = np.asarray([np.sqrt(lmda) for _ in range(hidden_dim - in_dim)])
+        #     S2 = np.vstack([np.diag(np.concatenate((S2_equal_dim, add_terms))),
+        #                     np.zeros((hidden_dim - in_dim, hidden_dim))]) 
+        #     S1 = np.vstack([np.diag(S1_equal_dim), 
+        #                     np.zeros((hidden_dim - in_dim, in_dim))])
+        # elif in_dim > out_dim:
+        #     add_terms = np.asarray([-np.sqrt(-lmda) for _ in range(hidden_dim-out_dim)])
+        #     S1 = np.hstack([np.diag(np.concatenate((S1_equal_dim, add_terms))),
+        #                     np.zeros((hidden_dim, in_dim - hidden_dim))])
+        #     S2 = np.hstack([np.diag(S2_equal_dim), 
+        #                     np.zeros((out_dim, hidden_dim - out_dim))]) 
+        
+        # self.S2 = S2 
+        # self.S1 = S1
+        
+        # self.S1 = self.S / self.S2
+        # self.S2 = np.diag(self.S2)
+        # self.S1 = np.diag(self.S1)
+
+        _, s1, _ = np.linalg.svd(init_w1)
+        _, s2, _ = np.linalg.svd(init_w2)
+
+        self.S1 = np.zeros((hidden_dim, in_dim))
+        self.S1[:len(s1), :len(s1)] = np.diag(s1)
+
+        self.S2 = np.zeros((out_dim, hidden_dim))
+        self.S2[:len(s2), :len(s2)] = np.diag(s2)
+
+        self.B = self.S2.T @ U.T @ U_ @ (self.X @ self.A + self.A) + self.S1 @ Vt @ V_ @ (self.A - self.X @ self.A)
+        self.C = self.S2.T @ U.T @ U_  @ (self.A - self.X @ self.A) - self.S1 @ Vt @ V_ @ (self.X @ self.A + self.A)
 
         self.sign = np.sign(self.output_dim-self.input_dim)
 
@@ -104,14 +139,16 @@ class QQT_lambda_balanced3:
         self.eval_extra_dim = self.sign * self.lmda/2 * np.ones(self.dim_diff)
         self.eval_extra_dim_inv = np.diag(1/self.eval_extra_dim)
 
-        if np.isclose(np.linalg.det(self.B), 0):
-            print('init_w1: ', init_w1)
-            print('init_w2: ', init_w2)
-            print('sigma_yx: ', sigma_yx_tilde)
-            print('B: ', self.B)
-            raise SingularMatrixError("B IS A SINGULAR MATRIX, CHECK INPUT")
+        # if np.isclose(np.linalg.det(self.B), 0):
+        #     print('init_w1: ', init_w1)
+        #     print('init_w2: ', init_w2)
+        #     print('sigma_yx: ', sigma_yx_tilde)
+        #     print('B: ', self.B)
+        #     raise SingularMatrixError("B IS A SINGULAR MATRIX, CHECK INPUT")
 
-        self.B_inv = np.linalg.inv(self.B)
+        # self.B_inv = np.linalg.inv(self.B)
+        
+        self.B_inv = np.linalg.pinv(self.B)
 
         
 
@@ -146,11 +183,17 @@ class QQT_lambda_balanced3:
 
         else:
             Z = np.vstack([
-                self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2 * self.V_hat @ e_eval_st_extra_dim @ self.V_hat.T @ self.V @ self.S1 @ self.B_inv.T @ e_eval_st_inv,
+                self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2 * self.V_hat @ e_eval_st_extra_dim @ self.V_hat.T @ self.V @ self.S1.T @ self.B_inv.T @ e_eval_st_inv,
                 self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2 * self.U_hat @ e_eval_st_extra_dim @ self.U_hat.T @ self.U @ self.S2 @ self.B_inv.T @ e_eval_st_inv
             ])
 
-            center_add = 2 * (self.S1 @ self.V.T @ self.V_hat + self.S2 @ self.U.T @ self.U_hat) @ (e_eval_2st_extra_dim - np.eye(self.dim_diff)) @ self.eval_extra_dim_inv @ (self.V_hat.T @ self.V @ self.S1 + self.U_hat.T @ self.U @ self.S2)
+            min_dim = min(in_dim, hidden_dim)
+            s1_add = self.S1[:min_dim, :min_dim]
+            s2_add = self.S2[:min_dim, :min_dim]
+            # center_add = np.sqrt(2) * (self.S1 @ self.V.T @ self.V_hat + self.S2.T @ self.U.T @ self.U_hat) @ (e_eval_2st_extra_dim - np.eye(self.dim_diff)) @ self.eval_extra_dim_inv @ (self.V_hat.T @ self.V @ self.S1.T + self.U_hat.T @ self.U @ self.S2)
+
+            center_add = np.sqrt(2) * (s1_add @ self.V.T @ self.V_hat + s2_add @ self.U.T @ self.U_hat) @ (e_eval_2st_extra_dim - np.eye(self.dim_diff)) @ self.eval_extra_dim_inv @ (self.V_hat.T @ self.V @ s1_add + self.U_hat.T @ self.U @ s2_add)
+
         
         center_left = 4 * e_eval_st_inv @ self.B_inv @ self.B_inv.T @ e_eval_st_inv
 
@@ -170,6 +213,10 @@ class QQT_lambda_balanced3:
         x = np.linalg.solve(L.T, y)
         qqt = x.T @ Z.T
 
+        # # add_term = np.diag([self.lmda for _ in range(self.input_dim)] + [-self.lmda for _ in range(self.input_dim)])
+
+        # qqt = qqt + add_term
+
         
         if self.weights_only:
             qqt = qqt[self.input_dim:, :self.input_dim] 
@@ -180,11 +227,11 @@ class QQT_lambda_balanced3:
 
 
 
-in_dim = 5
+in_dim = 3
 hidden_dim = 5
-out_dim = 
+out_dim = 7
 
-lmda = 100
+lmda = 1
 
 batch_size = 10
 learning_rate = 0.001 / lmda
@@ -192,8 +239,8 @@ training_steps = int(200 * np.sqrt(lmda))
 
 # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
 
-init_w1, init_w2, _, lmda  = balanced_weights(in_dim, hidden_dim, out_dim)
-lmda = lmda[0][0]
+init_w1, init_w2  = get_lambda_balanced(lmda, in_dim, hidden_dim, out_dim)
+# lmda = lmda[0][0]
 
 
 # a = (np.sqrt(lmda) + 1)
@@ -235,7 +282,7 @@ reps = (np.asarray(rep2)[:, 0, :, :])
 for color, output in zip(blind_colours, reps.T):
     for val in output:
         plt.plot(val, c=color, lw=2.5, label='Representation')
-    plt.plot((rep1_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
+    plt.plot((rep2_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
     
 for color, target in zip(blind_colours, Y[:plot_items_n]):
     for value in target:
@@ -252,7 +299,7 @@ reps = (np.asarray(rep1)[:, 0, :, :])
 for color, output in zip(blind_colours, reps.T):
     for val in output:
         plt.plot(val, c=color, lw=2.5, label='Representation')
-    plt.plot((rep2_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
+    plt.plot((rep1_analytical).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
     
 for color, target in zip(blind_colours, Y[:plot_items_n]):
     for value in target:
