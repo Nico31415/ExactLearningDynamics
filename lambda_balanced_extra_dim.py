@@ -182,17 +182,36 @@ class QQT_lambda_balanced3:
             center_add = 0.
 
         else:
-            Z = np.vstack([
-                self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2 * self.V_hat @ e_eval_st_extra_dim @ self.V_hat.T @ self.V @ self.S1.T @ self.B_inv.T @ e_eval_st_inv,
-                self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2 * self.U_hat @ e_eval_st_extra_dim @ self.U_hat.T @ self.U @ self.S2 @ self.B_inv.T @ e_eval_st_inv
+
+            Z_add = np.vstack([
+                self.V_hat @ e_eval_st_extra_dim @ self.V_hat.T @ self.V @ self.S1.T @ self.B_inv.T @ e_eval_st_inv,
+                self.U_hat @ e_eval_st_extra_dim @ self.U_hat.T @ self.U @ self.S2 @ self.B_inv.T @ e_eval_st_inv
             ])
 
-            min_dim = min(in_dim, hidden_dim)
-            s1_add = self.S1[:min_dim, :min_dim]
-            s2_add = self.S2[:min_dim, :min_dim]
+            Z = np.vstack([
+                self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv),
+                self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv)
+            ])
+
+            Z = Z + Z_add
+
+            # Z = np.vstack([
+            #     self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2 * self.V_hat @ e_eval_st_extra_dim @ self.V_hat.T @ self.V @ self.S1.T @ self.B_inv.T @ e_eval_st_inv,
+            #     self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2 * self.U_hat @ e_eval_st_extra_dim @ self.U_hat.T @ self.U @ self.S2 @ self.B_inv.T @ e_eval_st_inv
+            # ])
+
+            # min_dim = min(in_dim, hidden_dim)
+            # max_dim = max(in_dim, out_dim)
+            # s1_add = self.S1[:min_dim, :min_dim]
+            # s2_add = self.S2[:max_dim, :min_dim]
             # center_add = np.sqrt(2) * (self.S1 @ self.V.T @ self.V_hat + self.S2.T @ self.U.T @ self.U_hat) @ (e_eval_2st_extra_dim - np.eye(self.dim_diff)) @ self.eval_extra_dim_inv @ (self.V_hat.T @ self.V @ self.S1.T + self.U_hat.T @ self.U @ self.S2)
 
-            center_add = np.sqrt(2) * (s1_add @ self.V.T @ self.V_hat + s2_add @ self.U.T @ self.U_hat) @ (e_eval_2st_extra_dim - np.eye(self.dim_diff)) @ self.eval_extra_dim_inv @ (self.V_hat.T @ self.V @ s1_add + self.U_hat.T @ self.U @ s2_add)
+            center_add = (2 * e_eval_st_extra_dim @ self.B_inv
+                          @ (self.S1 @ self.V.T @ self.V_hat @ (e_eval_2st_extra_dim - i) @ self.eval_extra_dim_inv @ self.V_hat.T @ self.V @ self.S1.T
+                          + self.S2.T @ self.U.T @ self.U_hat @ (e_eval_2st_extra_dim - i) @ self.eval_extra_dim_inv @ self.U_hat.T @ self.U @ self.S2)
+            @self.B_inv.T @ e_eval_2st_inv) 
+
+            # center_add = np.sqrt(2) * (s1_add @ self.V.T @ self.V_hat + s2_add.T @ self.U.T @ self.U_hat) @ (e_eval_2st_extra_dim - np.eye(self.dim_diff)) @ self.eval_extra_dim_inv @ (self.V_hat.T @ self.V @ s1_add.T + self.U_hat.T @ self.U @ s2_add)
 
         
         center_left = 4 * e_eval_st_inv @ self.B_inv @ self.B_inv.T @ e_eval_st_inv
@@ -227,9 +246,9 @@ class QQT_lambda_balanced3:
 
 
 
-in_dim = 3
-hidden_dim = 5
-out_dim = 7
+in_dim = 2
+hidden_dim = 3
+out_dim = 4
 
 lmda = 1
 

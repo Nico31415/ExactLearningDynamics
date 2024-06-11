@@ -103,7 +103,7 @@ def get_lambda_balanced(lmda, in_dim, hidden_dim, out_dim, sigma=1):
     if out_dim > in_dim:
         add_terms = np.asarray([np.sqrt(lmda) for _ in range(hidden_dim - in_dim)])
         S2 = np.vstack([np.diag(np.concatenate((S2_equal_dim, add_terms))),
-                        np.zeros((hidden_dim - in_dim, hidden_dim))]) 
+                        np.zeros((out_dim - hidden_dim, hidden_dim))]) 
         S1 = np.vstack([np.diag(S1_equal_dim), 
                         np.zeros((hidden_dim - in_dim, in_dim))])
     elif in_dim > out_dim:
