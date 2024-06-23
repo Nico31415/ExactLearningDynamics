@@ -22,7 +22,6 @@ import seaborn as sns
 # from empiricalTest import QQT_new
 # from balanced_weights import balanced_weights
 
-
 from utils import get_lambda_balanced, get_random_regression_task
 from linear_network import LinearNetwork
 class SingularMatrixError(Exception):
@@ -34,14 +33,12 @@ class QQT_lambda_balanced3:
 
         self.lmda = (init_w2.T @ init_w2 - init_w1 @ init_w1.T)[0][0] 
 
-        
 
         self.weights_only = weights_only
         self.batch_size = X.shape[0]
 
         self.input_dim = X.shape[1]
         self.output_dim = Y.shape[1]
-
 
 
         i = np.identity(self.input_dim) if self.input_dim < self.output_dim else np.identity(self.output_dim) 
@@ -124,12 +121,31 @@ class QQT_lambda_balanced3:
         _, s2, _ = np.linalg.svd(init_w2)
 
         self.S1 = np.zeros((hidden_dim, in_dim))
-        self.S1[:len(s1), :len(s1)] = np.diag(s1)
-
+        self.S1_prime = np.zeros((hidden_dim, hidden_dim))
         self.S2 = np.zeros((out_dim, hidden_dim))
-        self.S2[:len(s2), :len(s2)] = np.diag(s2)
+        self.S2_prime = np.zeros((hidden_dim, hidden_dim))
+
+
+        self.dim_diff_hidden_output = hidden_dim - self.output_dim
+        if self.dim_diff_hidden_output > 0:
+            self.S1[:(len(s1)-self.dim_diff_hidden_output), :(len(s1)-self.dim_diff_hidden_output)] = np.diag(s1)[:(len(s1)-self.dim_diff_hidden_output),:(len(s1)-self.dim_diff_hidden_output)]
+            self.S1[(len(s1)-self.dim_diff_hidden_output):len(s1), (len(s1)-self.dim_diff_hidden_output):len(s1)] = np.diag(np.ones((self.dim_diff_hidden_output,1))*10e-40)
+            self.S1_prime[:len(s1), :len(s1)] = np.diag(s1)
+        else:
+            self.S1[:len(s1), :len(s1)] = np.diag(s1)
+
+        self.dim_diff_hidden_input = hidden_dim - self.input_dim
+        if self.dim_diff_hidden_input > 0:
+            self.S2[:(len(s2)-self.dim_diff_hidden_input), :(len(s2)-self.dim_diff_hidden_input)] = np.diag(s2)[:(len(s2)-self.dim_diff_hidden_input), :(len(s2)-self.dim_diff_hidden_input)]
+            self.S2[(len(s2) - self.dim_diff_hidden_input):len(s2),
+            (len(s2) - self.dim_diff_hidden_input):len(s2)] = np.diag(
+                np.ones((self.dim_diff_hidden_input, 1)) * 10e-40)
+            self.S2_prime[:len(s2), :len(s2)] = np.diag(s2)
+        else:
+            self.S2[:len(s2), :len(s2)] = np.diag(s2)
 
         self.B = self.S2.T @ U.T @ U_ @ (self.X @ self.A + self.A) + self.S1 @ Vt @ V_ @ (self.A - self.X @ self.A)
+
         self.C = self.S2.T @ U.T @ U_  @ (self.A - self.X @ self.A) - self.S1 @ Vt @ V_ @ (self.X @ self.A + self.A)
 
         self.sign = np.sign(self.output_dim-self.input_dim)
@@ -150,9 +166,6 @@ class QQT_lambda_balanced3:
         
         self.B_inv = np.linalg.pinv(self.B)
 
-        
-
-        
         # self.A_0 = S
 
         self.t = 0
@@ -193,7 +206,7 @@ class QQT_lambda_balanced3:
                 self.U_ @ ((self.A + self.X @ self.A) + (self.A - self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv)
             ])
 
-            Z = Z + Z_add
+            Z = Z + 2 * Z_add
 
             # Z = np.vstack([
             #     self.V_ @ ((self.A - self.X @ self.A) - (self.A + self.X @ self.A) @ e_eval_st_inv @ self.C.T @ self.B_inv.T @ e_eval_st_inv) + 2 * self.V_hat @ e_eval_st_extra_dim @ self.V_hat.T @ self.V @ self.S1.T @ self.B_inv.T @ e_eval_st_inv,
@@ -206,10 +219,14 @@ class QQT_lambda_balanced3:
             # s2_add = self.S2[:max_dim, :min_dim]
             # center_add = np.sqrt(2) * (self.S1 @ self.V.T @ self.V_hat + self.S2.T @ self.U.T @ self.U_hat) @ (e_eval_2st_extra_dim - np.eye(self.dim_diff)) @ self.eval_extra_dim_inv @ (self.V_hat.T @ self.V @ self.S1.T + self.U_hat.T @ self.U @ self.S2)
 
-            center_add = (2 * e_eval_st_extra_dim @ self.B_inv
-                          @ (self.S1 @ self.V.T @ self.V_hat @ (e_eval_2st_extra_dim - i) @ self.eval_extra_dim_inv @ self.V_hat.T @ self.V @ self.S1.T
-                          + self.S2.T @ self.U.T @ self.U_hat @ (e_eval_2st_extra_dim - i) @ self.eval_extra_dim_inv @ self.U_hat.T @ self.U @ self.S2)
-            @self.B_inv.T @ e_eval_2st_inv) 
+            center_add = np.sqrt(2) * e_eval_st_inv @ self.B_inv @ (self.S1 @ self.V.T @ self.V_hat + self.S2.T @ self.U.T @ self.U_hat) @ (
+                        e_eval_2st_extra_dim - np.eye(self.dim_diff)) @ self.eval_extra_dim_inv @ (
+                                     self.V_hat.T @ self.V @ self.S1.T+ self.U_hat.T @ self.U @ self.S2)@self.B_inv.T @ e_eval_st_inv
+
+            #center_add = (2 * e_eval_st_extra_dim @ self.B_inv
+                          #@ (self.S1 @ self.V.T @ self.V_hat @ (e_eval_2st_extra_dim - i_center) @ self.eval_extra_dim_inv @ self.V_hat.T @ self.V @ self.S1.T
+            # + self.S2.T @ self.U.T @ self.U_hat @ (e_eval_2st_extra_dim - i_center) @ self.eval_extra_dim_inv @ self.U_hat.T @ self.U @ self.S2)
+            # @self.B_inv.T @ e_eval_2st_inv)
 
             # center_add = np.sqrt(2) * (s1_add @ self.V.T @ self.V_hat + s2_add.T @ self.U.T @ self.U_hat) @ (e_eval_2st_extra_dim - np.eye(self.dim_diff)) @ self.eval_extra_dim_inv @ (self.V_hat.T @ self.V @ s1_add.T + self.U_hat.T @ self.U @ s2_add)
 
@@ -246,21 +263,21 @@ class QQT_lambda_balanced3:
 
 
 
-in_dim = 2
-hidden_dim = 3
-out_dim = 4
+in_dim = 4
+hidden_dim = 4
+out_dim = 3
 
-lmda = 1
+lmda = -100
 
 batch_size = 10
-learning_rate = 0.001 / lmda
-training_steps = int(200 * np.sqrt(lmda))
+learning_rate = 0.0007 / np.sqrt(lmda**2)
+training_steps = int(500* np.sqrt(np.sqrt(lmda**2)))
 
 # init_w1, init_w2 = zero_balanced_weights(in_dim, hidden_dim, out_dim, 0.35)
 
 init_w1, init_w2  = get_lambda_balanced(lmda, in_dim, hidden_dim, out_dim)
+print( init_w2.T @ init_w2 -init_w1 @ init_w1.T)
 # lmda = lmda[0][0]
-
 
 # a = (np.sqrt(lmda) + 1)
 # b = np.sqrt(2*np.sqrt(lmda) + 1)
@@ -269,13 +286,19 @@ init_w1, init_w2  = get_lambda_balanced(lmda, in_dim, hidden_dim, out_dim)
 # init_w2 = np.eye(hidden_dim)*b
 
 X, Y = get_random_regression_task(batch_size, in_dim, out_dim)
-
 U_, S_, Vt_ = np.linalg.svd(Y @ X.T / batch_size)
 
 model = LinearNetwork(in_dim, hidden_dim, out_dim, init_w1.copy(), init_w2.copy())
 w1s, w2s, losses = model.train(X, Y, training_steps, learning_rate)
 ws = np.array([w2 @ w1 for (w2, w1) in zip(w2s, w1s)])
+W1s = np.array([ w1 for (w1) in zip( w1s)])
+W2s = np.array([ w2 for (w2) in zip( w2s)])
 ws = np.expand_dims(ws, axis=1)
+W1s_five =W1s[400,0,:,:]
+W2s_five =W2s[400,0,:,:]
+print(W2s_five.T @ W2s_five- W1s_five@ W1s_five.T)
+print((W2s_five.T @ W2s_five- W1s_five@ W1s_five.T)-(init_w2.T @ init_w2 -init_w1 @ init_w1.T))
+
 
 analytical2 = QQT_lambda_balanced3(init_w1.copy(), init_w2.copy(), X.T, Y.T, False)
 analytical2 = np.asarray([analytical2.forward(learning_rate) for _ in range(training_steps)])
@@ -330,15 +353,16 @@ plt.ylabel('Network Representation (W1)')
 plt.legend(['output', 'analytical'])
 
 
-
-
 plt.figure()
 
-analytical2 = [a[in_dim:, :in_dim] for a in analytical2]
+analytical1 = [a[in_dim:, :in_dim] for a in analytical2]
 for color, output in zip(blind_colours, outputs.T):
+    i=0
     for val in output:
+        i= i+1
+        print(i)
         plt.plot(val, c=color, lw=2.5, label='output')
-    plt.plot((analytical2 @ X[:,:plot_items_n]).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
+    plt.plot((analytical1 @ X[:,:plot_items_n]).reshape(training_steps, -1), lw=3., c="k", alpha=0.7, linestyle=(0, (1, 2)), label='analytical') # (0, (3, 4, 3, 1))
     
 for color, target in zip(blind_colours, Y[:plot_items_n]):
     for value in target:
@@ -350,3 +374,4 @@ plt.ylabel('Network Output')
 plt.legend(['output', 'analytical'])
 
 plt.show()
+print('hello')

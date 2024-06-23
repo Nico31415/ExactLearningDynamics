@@ -78,16 +78,16 @@ def get_lambda_balanced(lmda, in_dim, hidden_dim, out_dim, sigma=1):
 
     if out_dim > in_dim and lmda < 0:
         print('Lambda must be positive if out_dim > in_dim')
-        return 
+        #return
     if in_dim > out_dim and lmda > 0:
         print('Lambda must be positive if in_dim > out_dim')
-        return 
+        #return
     if hidden_dim < min(in_dim, out_dim):
         print('Network cannot be bottlenecked')
-        return 
+        #return
     if hidden_dim > max(in_dim, out_dim) and lmda != 0:
         print('hidden_dim cannot be the largest dimension if lambda is not 0')
-        return 
+        #return
     
     #add check here for dimensions and lambda
     w1 = sigma * np.random.randn(hidden_dim, in_dim)
@@ -107,7 +107,7 @@ def get_lambda_balanced(lmda, in_dim, hidden_dim, out_dim, sigma=1):
         S1 = np.vstack([np.diag(S1_equal_dim), 
                         np.zeros((hidden_dim - in_dim, in_dim))])
     elif in_dim > out_dim:
-        add_terms = np.asarray([-np.sqrt(-lmda) for _ in range(hidden_dim-out_dim)])
+        add_terms = np.asarray([-np.sqrt(-lmda*0) for _ in range(hidden_dim-out_dim)])
         S1 = np.hstack([np.diag(np.concatenate((S1_equal_dim, add_terms))),
                         np.zeros((hidden_dim, in_dim - hidden_dim))])
         S2 = np.hstack([np.diag(S2_equal_dim), 
@@ -116,8 +116,12 @@ def get_lambda_balanced(lmda, in_dim, hidden_dim, out_dim, sigma=1):
     else:
         S2 = np.diag(S2_equal_dim)
         S1 = np.diag(S1_equal_dim)
+
     init_w2 =  U @ S2 @ R.T 
-    init_w1 = R @ S1 @ Vt 
+    init_w1 = R @ S1 @ Vt
+
+    R @ S2.T @S2 @R.T- R.T@S1 @ S1.T@R
+    print(init_w2.T[:2,:2] @ init_w2[:2,:2] - init_w1[:2,:2]  @ init_w1.T[:2,:2] )
 
     return init_w1, init_w2 
 
